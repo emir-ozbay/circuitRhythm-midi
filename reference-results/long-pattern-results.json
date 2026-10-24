@@ -1,0 +1,703 @@
+{
+  "firmware_sha256": "11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf",
+  "scope": "Stock function boundary experiments and host-side page adapter model. No device or patched firmware.",
+  "unsafe_direct_extension": {
+    "reproduced_cases": 96,
+    "details": [
+      {
+        "setter": "note",
+        "human_step": 33,
+        "modified_buffer_byte": 32,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 34,
+        "modified_buffer_byte": 33,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 35,
+        "modified_buffer_byte": 34,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 36,
+        "modified_buffer_byte": 35,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 37,
+        "modified_buffer_byte": 36,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 38,
+        "modified_buffer_byte": 37,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 39,
+        "modified_buffer_byte": 38,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 40,
+        "modified_buffer_byte": 39,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 41,
+        "modified_buffer_byte": 40,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 42,
+        "modified_buffer_byte": 41,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 43,
+        "modified_buffer_byte": 42,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 44,
+        "modified_buffer_byte": 43,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 45,
+        "modified_buffer_byte": 44,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 46,
+        "modified_buffer_byte": 45,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 47,
+        "modified_buffer_byte": 46,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 48,
+        "modified_buffer_byte": 47,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 49,
+        "modified_buffer_byte": 48,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 50,
+        "modified_buffer_byte": 49,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 51,
+        "modified_buffer_byte": 50,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 52,
+        "modified_buffer_byte": 51,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 53,
+        "modified_buffer_byte": 52,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 54,
+        "modified_buffer_byte": 53,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 55,
+        "modified_buffer_byte": 54,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 56,
+        "modified_buffer_byte": 55,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 57,
+        "modified_buffer_byte": 56,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 58,
+        "modified_buffer_byte": 57,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 59,
+        "modified_buffer_byte": 58,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 60,
+        "modified_buffer_byte": 59,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 61,
+        "modified_buffer_byte": 60,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 62,
+        "modified_buffer_byte": 61,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 63,
+        "modified_buffer_byte": 62,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "note",
+        "human_step": 64,
+        "modified_buffer_byte": 63,
+        "alias": "gate lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 33,
+        "modified_buffer_byte": 64,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 34,
+        "modified_buffer_byte": 65,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 35,
+        "modified_buffer_byte": 66,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 36,
+        "modified_buffer_byte": 67,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 37,
+        "modified_buffer_byte": 68,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 38,
+        "modified_buffer_byte": 69,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 39,
+        "modified_buffer_byte": 70,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 40,
+        "modified_buffer_byte": 71,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 41,
+        "modified_buffer_byte": 72,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 42,
+        "modified_buffer_byte": 73,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 43,
+        "modified_buffer_byte": 74,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 44,
+        "modified_buffer_byte": 75,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 45,
+        "modified_buffer_byte": 76,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 46,
+        "modified_buffer_byte": 77,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 47,
+        "modified_buffer_byte": 78,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 48,
+        "modified_buffer_byte": 79,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 49,
+        "modified_buffer_byte": 80,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 50,
+        "modified_buffer_byte": 81,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 51,
+        "modified_buffer_byte": 82,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 52,
+        "modified_buffer_byte": 83,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 53,
+        "modified_buffer_byte": 84,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 54,
+        "modified_buffer_byte": 85,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 55,
+        "modified_buffer_byte": 86,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 56,
+        "modified_buffer_byte": 87,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 57,
+        "modified_buffer_byte": 88,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 58,
+        "modified_buffer_byte": 89,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 59,
+        "modified_buffer_byte": 90,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 60,
+        "modified_buffer_byte": 91,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 61,
+        "modified_buffer_byte": 92,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 62,
+        "modified_buffer_byte": 93,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 63,
+        "modified_buffer_byte": 94,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "gate",
+        "human_step": 64,
+        "modified_buffer_byte": 95,
+        "alias": "flags lane"
+      },
+      {
+        "setter": "flags",
+        "human_step": 33,
+        "modified_buffer_byte": 96,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 34,
+        "modified_buffer_byte": 97,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 35,
+        "modified_buffer_byte": 98,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 36,
+        "modified_buffer_byte": 99,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 37,
+        "modified_buffer_byte": 100,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 38,
+        "modified_buffer_byte": 101,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 39,
+        "modified_buffer_byte": 102,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 40,
+        "modified_buffer_byte": 103,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 41,
+        "modified_buffer_byte": 104,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 42,
+        "modified_buffer_byte": 105,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 43,
+        "modified_buffer_byte": 106,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 44,
+        "modified_buffer_byte": 107,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 45,
+        "modified_buffer_byte": 108,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 46,
+        "modified_buffer_byte": 109,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 47,
+        "modified_buffer_byte": 110,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 48,
+        "modified_buffer_byte": 111,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 49,
+        "modified_buffer_byte": 112,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 50,
+        "modified_buffer_byte": 113,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 51,
+        "modified_buffer_byte": 114,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 52,
+        "modified_buffer_byte": 115,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 53,
+        "modified_buffer_byte": 116,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 54,
+        "modified_buffer_byte": 117,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 55,
+        "modified_buffer_byte": 118,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 56,
+        "modified_buffer_byte": 119,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 57,
+        "modified_buffer_byte": 120,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 58,
+        "modified_buffer_byte": 121,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 59,
+        "modified_buffer_byte": 122,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 60,
+        "modified_buffer_byte": 123,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 61,
+        "modified_buffer_byte": 124,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 62,
+        "modified_buffer_byte": 125,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 63,
+        "modified_buffer_byte": 126,
+        "alias": "past 24-word ST2 layout"
+      },
+      {
+        "setter": "flags",
+        "human_step": 64,
+        "modified_buffer_byte": 127,
+        "alias": "past 24-word ST2 layout"
+      }
+    ],
+    "interpretation": "Expected failures of naive extension, successfully reproduced. They are NOT successful long-pattern edits."
+  },
+  "player_boundary": {
+    "cases": [
+      {
+        "human_step": 1,
+        "relative_record_address": "0x0",
+        "event": {
+          "note": 60,
+          "velocity": 100,
+          "gate_ticks": 2,
+          "tie": 0
+        }
+      },
+      {
+        "human_step": 16,
+        "relative_record_address": "0x78",
+        "event": {
+          "note": 60,
+          "velocity": 100,
+          "gate_ticks": 2,
+          "tie": 0
+        }
+      },
+      {
+        "human_step": 17,
+        "relative_record_address": "0x80",
+        "event": {
+          "note": 60,
+          "velocity": 100,
+          "gate_ticks": 2,
+          "tie": 0
+        }
+      },
+      {
+        "human_step": 32,
+        "relative_record_address": "0xf8",
+        "event": {
+          "note": 60,
+          "velocity": 100,
+          "gate_ticks": 2,
+          "tie": 0
+        }
+      },
+      {
+        "human_step": 33,
+        "relative_record_address": "0x100",
+        "event": {
+          "note": 13,
+          "velocity": 80,
+          "gate_ticks": 3,
+          "tie": 1
+        }
+      }
+    ],
+    "finding": "Direct step index 32 reads pattern+0x100 (settings), not a 33rd note record.",
+    "mocked": "Note scheduling intercepted; no actual note lifetime, Note Off, MIDI or DSP executed."
+  },
+  "host_page_adapter_playback": {
+    "steps_verified": 128,
+    "gate_rate_entry_0": 2,
+    "verified": "All page/local record addresses, note, velocity, scaled gate and tie arguments match.",
+    "not_verified": "Gate/tie lifetime across pages, mutation, scheduler page switching, storage, UI, project operations.",
+    "warning": "128 steps is a test fixture capacity, not a selected product limit or on-device memory allocation."
+  },
+  "host_page_adapter_editing": {
+    "cases_passed": 384,
+    "verified": "Local indices only; target fields and all other page buffers checked after every edit.",
+    "not_verified": "Commit/notify, actual firmware allocation, current UI and persistence."
+  },
+  "stock_microstep_probability": {
+    "cases_passed": 3456,
+    "function": "0x0804aeee",
+    "mocked_calls": [],
+    "conditions": "Synthetic player and pattern memory, no held ties, fifth argument zero, controlled pre-existing random threshold.",
+    "verified": "Six microstep positions; empty/single/multiple hit masks; probability acceptance and untouched other hit bits across four backing pages.",
+    "not_verified": "RNG distribution, real clock, note lifetime and gate/tie transitions."
+  },
+  "length_gesture_host_model": {
+    "lengths_passed": 128,
+    "invalid_cases_rejected": 5,
+    "example": "page 2 + pad 10 => length 42",
+    "limit": "Arithmetic only; no button event or timing integration."
+  },
+  "memory_estimates": {
+    "assumptions": "8 tracks, 8 patterns/track retained. Costs exclude allocator overhead and added edit buffers.",
+    "source_reported_heap_margin_bytes_unverified_on_user_device": 3272,
+    "rows": [
+      {
+        "steps": 32,
+        "extra_note_records_bytes": 0,
+        "extra_full_32step_blocks_bytes": 0,
+        "total_full_pattern_blocks_bytes": 166400
+      },
+      {
+        "steps": 64,
+        "extra_note_records_bytes": 16384,
+        "extra_full_32step_blocks_bytes": 166400,
+        "total_full_pattern_blocks_bytes": 332800
+      },
+      {
+        "steps": 128,
+        "extra_note_records_bytes": 49152,
+        "extra_full_32step_blocks_bytes": 499200,
+        "total_full_pattern_blocks_bytes": 665600
+      }
+    ],
+    "note": "Full block duplication preserves a stock-sized automation area per page but is just one expensive design; not proof all other designs are impossible."
+  },
+  "status": {
+    "stock_32_boundary": "CONFIRMED: naive extension aliases data",
+    "paged_adapter": "HOST POC PASSED, not firmware implementation",
+    "gate_tie_lifetime": "NOT TESTED",
+    "mutation": "NOT TESTED",
+    "projects_isolation": "NOT IMPLEMENTED/TESTED",
+    "packs_disabled": "NOT IMPLEMENTED/TESTED",
+    "mode_shortcut": "NOT IMPLEMENTED/TESTED",
+    "physical_device": "NOT TESTED"
+  }
+}

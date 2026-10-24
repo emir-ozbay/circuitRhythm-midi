@@ -1,0 +1,281 @@
+{
+  "created": "2026-10-24",
+  "purpose": "initial handoff integrity; not a signature",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 111,
+      "sha256": "d6f37ae403cab6e7b71cadd35ba816c6795681b8ae123f117a9bfe7e77fbcd93"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 197,
+      "sha256": "b773354587730af619a9700706d1b362bf8c01cfae260565e2eee014e59aad7a"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 4225,
+      "sha256": "6a7b3cf08388e9297336ca9036a6025b96bd21ff1a071f498a28b72ae1805d39"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 323,
+      "sha256": "b82265b0bf5a6439f8ae12aa9892744fcb7b7c4736614cabd3c618a7a17da891"
+    },
+    {
+      "path": "CODEX-FIRST-MESSAGE.txt",
+      "bytes": 1295,
+      "sha256": "7089e00ff91ec6bb5506b6065016d7f4283f69ebb0c75f61175eed811cc08187"
+    },
+    {
+      "path": "GITHUB-RESOURCES.txt",
+      "bytes": 4797,
+      "sha256": "22c95fd2db3306ad001d613d7f994069b3e3408fa4a1e617a953bf9bea4c5681"
+    },
+    {
+      "path": "START-HERE.md",
+      "bytes": 3996,
+      "sha256": "98bcfce4cc190ebdf46595be35bc488ddcedafd9c846c5e7f515acabafffac6e"
+    },
+    {
+      "path": "THIRD-PARTY-NOTICES.md",
+      "bytes": 563,
+      "sha256": "b9db6fc710a9f51fb5ae518f9ef4cdb26c292e71abd4def5d54cd1fcbef08cd6"
+    },
+    {
+      "path": "analysis/LONG-PATTERN-TESTS.md",
+      "bytes": 7720,
+      "sha256": "7c3e266e051d57084bc2bd213ac5a9e14a60f1f050e767f8e7ab6c97d75f2546"
+    },
+    {
+      "path": "analysis/README.md",
+      "bytes": 15329,
+      "sha256": "cbeb3f09e17f044d42f8bae2b32c13431a9d6cea8ed7a163b76e58bd80167eb0"
+    },
+    {
+      "path": "analysis/provenance.json",
+      "bytes": 6618,
+      "sha256": "bf6efb9f7b1c802d43e78ba0ad84a1f75a65e6796d97de5f0debd24986749908"
+    },
+    {
+      "path": "analysis/requirements.txt",
+      "bytes": 31,
+      "sha256": "40ba8069b2c2bb723e399b119ce94a0806acf19849bb6040897c3adb4a6947f2"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/LICENSE",
+      "bytes": 1417,
+      "sha256": "a926326622d62bd415c21edac125f0d3c567c272845fafd0907bc8f67c691b54"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/drumpat.py",
+      "bytes": 39258,
+      "sha256": "af483c89c5480d2cd67306c240a6cc08a5d5a8cae4a01e804ab6e40ded530efb"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/midithru.py",
+      "bytes": 9707,
+      "sha256": "4aab4c093f2f81b67462219f5764e85cf73a8f578ef02ffeeb6659db0036c78b"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/pitchmod.py",
+      "bytes": 5321,
+      "sha256": "0e69b7aaba3505cdc42059469768727a5bfae287eb700fce8fb4167d3b3173c7"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/quant.py",
+      "bytes": 17310,
+      "sha256": "92bba3ddf03b0956f82d8b97f9779626b37a2308b038c2a9cb9645a3a4a0b00a"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/rh_fw.py",
+      "bytes": 5855,
+      "sha256": "009bdfe53273cd23679e426ab5f8ff3d4e3805d8eed28e0f0eeef9603edb4b04"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/rhstate.py",
+      "bytes": 6798,
+      "sha256": "bccdde95707906997329e910a331f7d3ec2a6a114a2ecfd1f6f83f2a583f5b00"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/stockplus.py",
+      "bytes": 24244,
+      "sha256": "3d5ab593ba75b6afdd69cd23504e5e465aff0659294f2459732027746e715487"
+    },
+    {
+      "path": "analysis/sources/CIRCUIT-REMIX/tools/thumb.py",
+      "bytes": 19172,
+      "sha256": "934b03b611a56797df03e0a8491024f5c5b12d1afe2824f0731179d0835c28ed"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/LICENSE",
+      "bytes": 1250,
+      "sha256": "8605f4c0be3e03de3d46f51c56c5555cf4e3feebfdc97154dafe0ba1fb4da20d"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/dev/design/plock-fix.md",
+      "bytes": 4686,
+      "sha256": "2cc563494da158c5d0ad49c1e08462ba52ae27644e5ede090303fac54d735295"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/dev/design/project-extension-block.md",
+      "bytes": 5890,
+      "sha256": "6e3ec77bf5375254313b7b39dc292a8b4cfa79be7f73bfdd845f6e0c21f2edb2"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/dev/design/scales.md",
+      "bytes": 6518,
+      "sha256": "66c09955c5f8660eb5187cdef3bfc2ddc593ee20ddb1a556196af224f4c61597"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/dev/hardware.md",
+      "bytes": 6503,
+      "sha256": "ca861d8ca6ceed3dca09c8bce488b077b26c07406860e41515ef60e5e6054832"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/dev/maps.md",
+      "bytes": 3752,
+      "sha256": "300e5ed3ccb253b242cc8948476e171d5ac4fff2dd76d026164409d9ef2815a1"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/docs/input-map.json",
+      "bytes": 1409,
+      "sha256": "0ad3bc87b5d122780af8dc20ae2f97fe6c70659e89b277fb8418bccfa9284859"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/patches/src/notetap.c",
+      "bytes": 72112,
+      "sha256": "c3f4fb6b3443123f3aab292b9a64baf5918aee5b6bbfa57ac2672b633edb1188"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/patches/src/scales.c",
+      "bytes": 18261,
+      "sha256": "b750feaaa9f9611f9a563b56701c3b57be8401865edd4fdd5dbb8b25ce6f1c39"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/patches/src/trackmodes.c",
+      "bytes": 15166,
+      "sha256": "fb5776069483e9684eb023fc201e250ecab033d875b461ab518d5b15aed75558"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/tools/build_lightshow.py",
+      "bytes": 38080,
+      "sha256": "fbaeb22e1e8577d91fb5d56a87225dab59ea8aaf140700506416ea575caa0881"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/tools/patch.py",
+      "bytes": 6486,
+      "sha256": "8474630495026d2833b85d4df61e3282416974732859b2c284c157f6deb9ba33"
+    },
+    {
+      "path": "analysis/sources/arrhythmia/tools/syx.py",
+      "bytes": 6561,
+      "sha256": "a8d0d38eb315f75f6381ed521e5d7155f2ec545f9db038d63b3de1a54f31b2ef"
+    },
+    {
+      "path": "analysis/sources/cr_stereo/LICENSE",
+      "bytes": 1066,
+      "sha256": "c3cdaa184b82b5e67b8417cf362bd3204d6a537f7e671d41b7fb1e183c98aa25"
+    },
+    {
+      "path": "analysis/sources/cr_stereo/extract_firmware.py",
+      "bytes": 6409,
+      "sha256": "900456870ae84a830b3c2dfe3f90817ff513ab0cc5de1cc4e3f9bf6dbad2b0c5"
+    },
+    {
+      "path": "analysis/test_long_pattern.py",
+      "bytes": 10754,
+      "sha256": "793bc2ebcb632f2547ba1d47f9d1299975be93f00b443842f5c093b0760e7d8c"
+    },
+    {
+      "path": "analysis/verify_stock.py",
+      "bytes": 8022,
+      "sha256": "86279a94af3eb23f0b6b0243b37077bb84027a9a6ab18c0631254319dccbfc7c"
+    },
+    {
+      "path": "docs/HARDWARE-TEST.md",
+      "bytes": 1233,
+      "sha256": "689c9789681140e9524ba163c14c852f054b8cd9f47d43ff71d05aa8a9c798d3"
+    },
+    {
+      "path": "docs/RECOVERY.md",
+      "bytes": 3272,
+      "sha256": "c65fac293904c67f54489f4944c7de5de1b6225f9f736db9dcad8b4ce9104433"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "bytes": 2050,
+      "sha256": "4b927999b75b51f47114df9fdde5ffead4aa3d4076156f995420ea12a6846995"
+    },
+    {
+      "path": "docs/SCOPE.md",
+      "bytes": 2397,
+      "sha256": "3227ec732f88ce3168f180686a4bf51d7ce9060b3a7b29a3b48c5eb4bcb9068a"
+    },
+    {
+      "path": "docs/STATUS.md",
+      "bytes": 2301,
+      "sha256": "15fee69c5d6e0ac8e51a75a390b1959108e34c2b407004f1b31eb346921e4f35"
+    },
+    {
+      "path": "reference-results/long-pattern-results.json",
+      "bytes": 17888,
+      "sha256": "0dbad2d339c359fc8ea092c9917ef60c6fca0cafb48ee358c59e67b038520dbd"
+    },
+    {
+      "path": "reference-results/selected-disassembly.txt",
+      "bytes": 13505,
+      "sha256": "6cb5a8f7c923c08238446ce4c74bb72841d0b1668d2b4c6c4cfd4d1bb1b0202d"
+    },
+    {
+      "path": "reference-results/verification.json",
+      "bytes": 13434,
+      "sha256": "218eb96b407e09babc1c9ad9ce9d953a89b1330f3da0ef384cb77ed5e5ae5967"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 31,
+      "sha256": "40ba8069b2c2bb723e399b119ce94a0806acf19849bb6040897c3adb4a6947f2"
+    },
+    {
+      "path": "scripts/check_package.py",
+      "bytes": 1044,
+      "sha256": "c5d99040c7d81710991db72fe02e6b63ef827a81485bd3c661998964dd3cb912"
+    },
+    {
+      "path": "scripts/run_baseline.py",
+      "bytes": 3991,
+      "sha256": "e114d004e2b4b202d340f1ac7195aa90c5c9f21bdf6f04b4e347c8409ebab0ab"
+    },
+    {
+      "path": "scripts/setup.ps1",
+      "bytes": 692,
+      "sha256": "bfe601e314d4577c3f73d807fc4c6d2b44a35bc08d7fb641d3212c9e211b6a5a"
+    },
+    {
+      "path": "scripts/test.ps1",
+      "bytes": 371,
+      "sha256": "618f386fa9db9fb418fe99299ac6f0a68e30c0a8ba6bb5a09234d1c303342dde"
+    },
+    {
+      "path": "src/README.md",
+      "bytes": 177,
+      "sha256": "8d017341ed4d927f6c3e3bea21b4f01027f9a32a5582a7f1294c90b42c33e955"
+    },
+    {
+      "path": "stock/README.md",
+      "bytes": 493,
+      "sha256": "5d706e5ad74cdff477578bbec20be9a6359a6fa71c4482ac83013a7046d7d20d"
+    },
+    {
+      "path": "stock/circuitrhythm-firmware-5706.syx",
+      "bytes": 508861,
+      "sha256": "11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf"
+    },
+    {
+      "path": "tests/README.md",
+      "bytes": 209,
+      "sha256": "0a8c29fd1e250a8de9d7b01a453a12d8d612e847386245e22863d76b12c40134"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Bu klasör Circuit Rhythm MIDI sequencer projemin devralma paketidir. Önce AGENTS.md, START-HERE.md ve docs içindeki SCOPE, STATUS, ROADMAP, RECOVERY dosyalarını oku; sonra önceki analizleri incele.
+
+Şimdilik 32 adım tek ekranda gösterilecek. İleride tek pattern içinde sayfa değiştirerek 64 adıma geçmek istiyoruz, fakat bu aşamada 64 adımı geliştirme. Elektron davranışları ve polifoni kapsam dışında.
+
+İlk görev: paket bütünlüğünü kontrol et, yerel Python ortamını kur, scripts/run_baseline.py ile mevcut testleri çalıştır ve sonuçları docs/STATUS.md içine kaydet. Gerçek testlerle varsayımları ayır. Dosyaları değiştirmeden önce mevcut durumu incele; yerel Git deposunu hazırla ve firmware/yedeklerin Git dışında kaldığını doğrula. Bu aşamada cihaza bağlanma, MIDI/USB komutu gönderme veya firmware yükleme.
+
+Baseline geçince 32-pad görünümü için pad dispatch -> seçili track/pattern -> step edit -> commit/notify -> LED zincirini incele. Kesinleşen adresleri ve açık soruları docs içine kaydet. Henüz tam modu veya 64 adımlı sistemi yazma. İlk çok küçük, kontrollü firmware denemesinin kapsamını teknik kanıtlarla hazırla. Yükleme aşamasını benden ayrı, somut cihaz testi onayı almadan başlatma.

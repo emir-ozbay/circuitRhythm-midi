@@ -1,0 +1,79 @@
+CIRCUIT RHYTHM MIDI PROJESI — GITHUB KAYNAKLARI
+Hazırlanma: 24 Ekim 2026
+
+Bu dosya okuma/inceleme rehberidir; listelenen modları cihaza yükleme önerisi değildir.
+En yararlı ilk iki kaynak Arrhythmia ve Circuit Remix. Aşağıdaki sabit commit'ler
+bu sohbette incelenen sürümlerdir; main dalı ileride değişebilir.
+
+1) ARRHYTHMIA — pad/LED haritaları, note router, proje uzantısı
+Ana repo: https://github.com/llcoolkm/arrhythmia
+İncelenen commit:
+https://github.com/llcoolkm/arrhythmia/tree/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2
+
+Neden yararlı:
+- ARM tarafındaki Note On/Off hook'ları ve sample engine'den ayrılan yollar.
+- Pad/button/encoder indeksleri, LED haritalama belgeleri.
+- Proje sonundaki ek veri alanı ve validation/persistence tasarımı.
+- Hook noktalarını stock byte'larıyla karşılaştıran build altyapısı.
+
+Önce okunacaklar (commit sabit):
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/docs/dev/maps.md
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/docs/dev/hardware.md
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/docs/dev/design/project-extension-block.md
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/patches/src/notetap.c
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/tools/build_lightshow.py
+https://github.com/llcoolkm/arrhythmia/blob/a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2/tools/syx.py
+
+Dikkat: Dahili synth ve polifoni bizim ilk sürüm kapsamımızda değil. Belgelerdeki
+HW ölçümleri geliştiricinin cihazına ait; bizim cihazımızın ölçümü sayılmaz.
+Tam derleme ve emülasyonun bütün gerekli dosyalarının açık repoda bulunduğunu
+varsayma. Pakette yalnızca seçilmiş kaynak snapshot'ları vardır.
+
+2) CIRCUIT REMIX — step verisi, buffer yönetimi, MIDI yönlendirmesi
+Ana repo: https://github.com/Ghillermo/CIRCUIT-REMIX
+İncelenen commit:
+https://github.com/Ghillermo/CIRCUIT-REMIX/tree/928318078742d09617107b75c103a53d83dd08ef
+
+Neden yararlı:
+- Stock 32 adımın 8-baytlık kayıt düzeni ve edit buffer'ları.
+- Pattern/microstep davranışına müdahale eden örnekler.
+- MIDI out port-maskesi, MIDI thru/merge ve RAM rezervasyonu.
+
+Önce okunacaklar:
+https://github.com/Ghillermo/CIRCUIT-REMIX/blob/928318078742d09617107b75c103a53d83dd08ef/tools/quant.py
+https://github.com/Ghillermo/CIRCUIT-REMIX/blob/928318078742d09617107b75c103a53d83dd08ef/tools/drumpat.py
+https://github.com/Ghillermo/CIRCUIT-REMIX/blob/928318078742d09617107b75c103a53d83dd08ef/tools/midithru.py
+https://github.com/Ghillermo/CIRCUIT-REMIX/blob/928318078742d09617107b75c103a53d83dd08ef/tools/rhstate.py
+https://github.com/Ghillermo/CIRCUIT-REMIX/blob/928318078742d09617107b75c103a53d83dd08ef/tools/rh_fw.py
+
+Dikkat: Bu modun tamamını almak zorunda değiliz. Özellikle SD yazma özellikleri
+ilk prototipe taşınmamalı. quant.py/drumpat.py gibi dosyalar başka repo modüllerine
+bağımlıdır; pakette tek başına çalıştırılabilir değiller. Bazı açıklamalar RAM
+dump'larına dayanır; o dump'lar bu pakette yoktur.
+
+3) cr_stereo — SysEx çözümleme, firmware paketleme ve ARM/DSP ayrımı
+Ana repo: https://github.com/jsmith13/cr_stereo
+İncelenen commit:
+https://github.com/jsmith13/cr_stereo/tree/e88a11e772de80804015c34693658e497e4e890b
+
+Önce okunacak:
+https://github.com/jsmith13/cr_stereo/blob/e88a11e772de80804015c34693658e497e4e890b/tools/extract_firmware.py
+
+Bu çözümleyiciyi diğer iki repo ile karşılaştırdık; aynı görüntüyü elde ettik.
+Stereo/sampling özellikleri bizim hedefimiz değil. Kod yorumlarını otomatik doğru
+sayma: gerçek paket 37 adet 7-bit payload baytından 32 görüntü baytı üretir;
+çözücüdeki açıklayıcı yorumun farklı sayı vermesi veri kontrolünün yerini tutmaz.
+
+NASIL KULLANILMALI?
+- Codex'e önce bu dosyayı ve analysis/provenance.json'u okut.
+- Yeni dosya gerekiyorsa yukarıdaki sabit commit'ten al; kaynak ve hash kaydet.
+- main dalındaki yeni gelişmeleri ayrı incele; sessizce referans sürümünü değiştirme.
+- Kaynak kodda bulunan adrese körü körüne patch uygulama; stock baytları doğrula.
+- Kod yeniden kullanılırsa LICENSE ve copyright bildirimlerini koru.
+- Bir modun adresleri doğrulandı diye bütün özelliklerinin cihazda test edildiğini
+  varsayma. Firmware yaması ile UI tasarımı ayrı doğrulama ister.
+- Bu bağlantılar teknik inceleme içindir. Issue açma veya geliştiriciye mesaj
+  gönderme istenirse kullanıcı ayrıca karar vermelidir.
+
+Tam repo gerekiyorsa ileride git clone yapılabilir. Başlangıç testlerini çalıştırmak
+için clone şart değil; gerekli sınırlı snapshot'lar bu paketin içindedir.

@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+*.syx
+*.bin
+*.elf
+*.hex
+*.map
+*.zip
+build/
+logs/
+backups/
+analysis/vendor/
+analysis/verification.json
+analysis/long-pattern-results.json
+analysis/selected-disassembly.txt

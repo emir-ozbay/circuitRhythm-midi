@@ -1,0 +1,601 @@
+{
+  "input_sha256": "11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf",
+  "image_sha256": "d5b9ff5dadf2e284f80d69ecb7087486cf0df315a697bed8272af9de0e90df15",
+  "input_bytes": 508861,
+  "image_bytes": 370032,
+  "crc32_mpeg2": "9eee802c",
+  "three_decoders_agree": true,
+  "two_encoders_byte_identical": true,
+  "build_number_at_0x1ca": 5706,
+  "identity_string": "DR1.1.5143.5706",
+  "transport_version_bytes": "00 00 00 07 03 01",
+  "initial_sp": "0x20050000",
+  "reset_vector": "0x8069589",
+  "upstream_hook_checks": [
+    {
+      "kind": "STOCK_BL",
+      "address": "0x802596e",
+      "expected": "0x802960c",
+      "actual": "bl #0x802960c",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8026e42",
+      "expected": "0x802cf90",
+      "actual": "bl #0x802cf90",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80256de",
+      "expected": "0x8026134",
+      "actual": "bl #0x8026134",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x802ad36",
+      "expected": "0x802ad40",
+      "actual": "bl #0x802ad40",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x802586c",
+      "expected": "0x802677a",
+      "actual": "bl #0x802677a",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8033384",
+      "expected": "0x80333aa",
+      "actual": "bl #0x80333aa",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8037eb2",
+      "expected": "0x8037366",
+      "actual": "bl #0x8037366",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80386a8",
+      "expected": "0x8037366",
+      "actual": "bl #0x8037366",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8038750",
+      "expected": "0x8037366",
+      "actual": "bl #0x8037366",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80552ac",
+      "expected": "0x8055324",
+      "actual": "bl #0x8055324",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8037f54",
+      "expected": "0x8037a10",
+      "actual": "bl #0x8037a10",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8037fd6",
+      "expected": "0x80472e2",
+      "actual": "bl #0x80472e2",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x804c53a",
+      "expected": "0x8055dec",
+      "actual": "bl #0x8055dec",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x805d9ce",
+      "expected": "0x805dabe",
+      "actual": "bl #0x805dabe",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x805dc50",
+      "expected": "0x805dabe",
+      "actual": "bl #0x805dabe",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80580f8",
+      "expected": "0x805862c",
+      "actual": "bl #0x805862c",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x805e41a",
+      "expected": "0x805e5a0",
+      "actual": "bl #0x805e5a0",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80588c0",
+      "expected": "0x803fc58",
+      "actual": "bl #0x803fc58",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x803f00a",
+      "expected": "0x803fc58",
+      "actual": "bl #0x803fc58",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8040746",
+      "expected": "0x80406a8",
+      "actual": "bl #0x80406a8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80407ba",
+      "expected": "0x80406a8",
+      "actual": "bl #0x80406a8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80407e6",
+      "expected": "0x80406a8",
+      "actual": "bl #0x80406a8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8040834",
+      "expected": "0x80406a8",
+      "actual": "bl #0x80406a8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x804086c",
+      "expected": "0x80406a8",
+      "actual": "bl #0x80406a8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80334e6",
+      "expected": "0x80467d2",
+      "actual": "bl #0x80467d2",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x803a7ea",
+      "expected": "0x80467d2",
+      "actual": "bl #0x80467d2",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8025874",
+      "expected": "0x80297de",
+      "actual": "bl #0x80297de",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8025774",
+      "expected": "0x8026f38",
+      "actual": "bl #0x8026f38",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x806441e",
+      "expected": "0x80314d6",
+      "actual": "bl #0x80314d6",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8064496",
+      "expected": "0x80314d6",
+      "actual": "bl #0x80314d6",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8064542",
+      "expected": "0x80314d6",
+      "actual": "bl #0x80314d6",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8031484",
+      "expected": "0x8023416",
+      "actual": "bl #0x8023416",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80314cc",
+      "expected": "0x8023416",
+      "actual": "bl #0x8023416",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8031574",
+      "expected": "0x8023416",
+      "actual": "bl #0x8023416",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80315bc",
+      "expected": "0x8023416",
+      "actual": "bl #0x8023416",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80315dc",
+      "expected": "0x8023416",
+      "actual": "bl #0x8023416",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8053e26",
+      "expected": "0x8040e28",
+      "actual": "bl #0x8040e28",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8053e74",
+      "expected": "0x8053e8c",
+      "actual": "bl #0x8053e8c",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80460ba",
+      "expected": "0x8053e8c",
+      "actual": "bl #0x8053e8c",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8043c40",
+      "expected": "0x80536d2",
+      "actual": "bl #0x80536d2",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x8043c98",
+      "expected": "0x8053690",
+      "actual": "bl #0x8053690",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x802964e",
+      "expected": "0x8029684",
+      "actual": "bl #0x8029684",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80536c0",
+      "expected": "0x8031430",
+      "actual": "bl #0x8031430",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x804679e",
+      "expected": "0x8040874",
+      "actual": "bl #0x8040874",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80278e2",
+      "expected": "0x8031700",
+      "actual": "bl #0x8031700",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80278cc",
+      "expected": "0x8031110",
+      "actual": "bl #0x8031110",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BL",
+      "address": "0x80278a8",
+      "expected": "0x8031110",
+      "actual": "bl #0x8031110",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x80295ca",
+      "expected": "0x8040108",
+      "actual": "b.w #0x8040108",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x80295d8",
+      "expected": "0x804012a",
+      "actual": "b.w #0x804012a",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x80295e4",
+      "expected": "0x8040140",
+      "actual": "b.w #0x8040140",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x80295f0",
+      "expected": "0x8040152",
+      "actual": "b.w #0x8040152",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x80295fc",
+      "expected": "0x804015e",
+      "actual": "b.w #0x804015e",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x805a2c6",
+      "expected": "0x805f2f8",
+      "actual": "b.w #0x805f2f8",
+      "pass": true
+    },
+    {
+      "kind": "STOCK_BW",
+      "address": "0x8031a34",
+      "expected": "0x80467d2",
+      "actual": "b.w #0x80467d2",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_disp",
+      "address": "0x80696ac",
+      "expected": "0x8049b29",
+      "actual": "0x8049b29",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_macro",
+      "address": "0x8067e44",
+      "expected": "0x8058161",
+      "actual": "0x8058161",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fx",
+      "address": "0x806834c",
+      "expected": "0x805f2f9",
+      "actual": "0x805f2f9",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_ron",
+      "address": "0x80694b0",
+      "expected": "0x803b7ed",
+      "actual": "0x803b7ed",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_roff",
+      "address": "0x80694b4",
+      "expected": "0x803b8f1",
+      "actual": "0x803b8f1",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_nm_on",
+      "address": "0x8067b24",
+      "expected": "0x803abd9",
+      "actual": "0x803abd9",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_nm_off",
+      "address": "0x8067b28",
+      "expected": "0x803acbb",
+      "actual": "0x803acbb",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_eng_on",
+      "address": "0x80685e0",
+      "expected": "0x8031a19",
+      "actual": "0x8031a19",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_eng_off",
+      "address": "0x80685e4",
+      "expected": "0x8031a23",
+      "actual": "0x8031a23",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_midi_alloff",
+      "address": "0x80665ec",
+      "expected": "0x803f799",
+      "actual": "0x803f799",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_nm_obs",
+      "address": "0x8067b3c",
+      "expected": "0x803ad3d",
+      "actual": "0x803ad3d",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_mp_obs",
+      "address": "0x8067e60",
+      "expected": "0x80584db",
+      "actual": "0x80584db",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_sv_press",
+      "address": "0x8068294",
+      "expected": "0x805c1ad",
+      "actual": "0x805c1ad",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_length",
+      "address": "0x8066e5c",
+      "expected": "0x806438d",
+      "actual": "0x806438d",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_alloc",
+      "address": "0x8066e64",
+      "expected": "0x80643f5",
+      "actual": "0x80643f5",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_reset",
+      "address": "0x8066e68",
+      "expected": "0x8064417",
+      "actual": "0x8064417",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_bulk",
+      "address": "0x8066e6c",
+      "expected": "0x806444b",
+      "actual": "0x806444b",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_free",
+      "address": "0x8066e78",
+      "expected": "0x8064461",
+      "actual": "0x8064461",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_start",
+      "address": "0x8066e80",
+      "expected": "0x806446f",
+      "actual": "0x806446f",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_preview",
+      "address": "0x8066e84",
+      "expected": "0x80644e5",
+      "actual": "0x80644e5",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_trim",
+      "address": "0x8066e88",
+      "expected": "0x8064513",
+      "actual": "0x8064513",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_fs_stop",
+      "address": "0x8066e94",
+      "expected": "0x8064481",
+      "actual": "0x8064481",
+      "pass": true
+    },
+    {
+      "kind": "vtable",
+      "name": "hook_kb_obs",
+      "address": "0x80696f4",
+      "expected": "0x8055f69",
+      "actual": "0x8055f69",
+      "pass": true
+    }
+  ],
+  "stock_step_setter_emulation": {
+    "cases_passed": 1536,
+    "steps": "0..31",
+    "fields": [
+      "note",
+      "gate",
+      "flags"
+    ],
+    "actual_firmware_functions": [
+      "0x8054a5c",
+      "0x8054a84",
+      "0x8054ab0",
+      "0x0803fd26"
+    ],
+    "mocked_calls": [],
+    "synthetic_ram": true,
+    "limit": "Does not test UI dispatch, notification/commit, save/load, transport, hardware or timing."
+  },
+  "midi_mask_dispatch_emulation": {
+    "cases_passed": 8,
+    "function": "0x0802986a",
+    "mocked_calls": "Three output-port callbacks return success; no actual MIDI transmission or queue pressure tested."
+  }
+}

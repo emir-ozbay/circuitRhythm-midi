@@ -1,0 +1,170 @@
+[
+  {
+    "local_path": "sources/CIRCUIT-REMIX/LICENSE",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "LICENSE",
+    "sha256": "a926326622d62bd415c21edac125f0d3c567c272845fafd0907bc8f67c691b54"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/drumpat.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/drumpat.py",
+    "sha256": "af483c89c5480d2cd67306c240a6cc08a5d5a8cae4a01e804ab6e40ded530efb"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/midithru.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/midithru.py",
+    "sha256": "4aab4c093f2f81b67462219f5764e85cf73a8f578ef02ffeeb6659db0036c78b"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/pitchmod.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/pitchmod.py",
+    "sha256": "0e69b7aaba3505cdc42059469768727a5bfae287eb700fce8fb4167d3b3173c7"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/quant.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/quant.py",
+    "sha256": "92bba3ddf03b0956f82d8b97f9779626b37a2308b038c2a9cb9645a3a4a0b00a"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/rh_fw.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/rh_fw.py",
+    "sha256": "009bdfe53273cd23679e426ab5f8ff3d4e3805d8eed28e0f0eeef9603edb4b04"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/rhstate.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/rhstate.py",
+    "sha256": "bccdde95707906997329e910a331f7d3ec2a6a114a2ecfd1f6f83f2a583f5b00"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/stockplus.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/stockplus.py",
+    "sha256": "3d5ab593ba75b6afdd69cd23504e5e465aff0659294f2459732027746e715487"
+  },
+  {
+    "local_path": "sources/CIRCUIT-REMIX/tools/thumb.py",
+    "repo": "Ghillermo/CIRCUIT-REMIX",
+    "ref": "928318078742d09617107b75c103a53d83dd08ef",
+    "path": "tools/thumb.py",
+    "sha256": "934b03b611a56797df03e0a8491024f5c5b12d1afe2824f0731179d0835c28ed"
+  },
+  {
+    "local_path": "sources/arrhythmia/LICENSE",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "LICENSE",
+    "sha256": "8605f4c0be3e03de3d46f51c56c5555cf4e3feebfdc97154dafe0ba1fb4da20d"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/dev/design/plock-fix.md",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/dev/design/plock-fix.md",
+    "sha256": "2cc563494da158c5d0ad49c1e08462ba52ae27644e5ede090303fac54d735295"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/dev/design/project-extension-block.md",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/dev/design/project-extension-block.md",
+    "sha256": "6e3ec77bf5375254313b7b39dc292a8b4cfa79be7f73bfdd845f6e0c21f2edb2"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/dev/design/scales.md",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/dev/design/scales.md",
+    "sha256": "66c09955c5f8660eb5187cdef3bfc2ddc593ee20ddb1a556196af224f4c61597"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/dev/hardware.md",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/dev/hardware.md",
+    "sha256": "ca861d8ca6ceed3dca09c8bce488b077b26c07406860e41515ef60e5e6054832"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/dev/maps.md",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/dev/maps.md",
+    "sha256": "300e5ed3ccb253b242cc8948476e171d5ac4fff2dd76d026164409d9ef2815a1"
+  },
+  {
+    "local_path": "sources/arrhythmia/docs/input-map.json",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "docs/input-map.json",
+    "sha256": "0ad3bc87b5d122780af8dc20ae2f97fe6c70659e89b277fb8418bccfa9284859"
+  },
+  {
+    "local_path": "sources/arrhythmia/patches/src/notetap.c",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "patches/src/notetap.c",
+    "sha256": "c3f4fb6b3443123f3aab292b9a64baf5918aee5b6bbfa57ac2672b633edb1188"
+  },
+  {
+    "local_path": "sources/arrhythmia/patches/src/scales.c",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "patches/src/scales.c",
+    "sha256": "b750feaaa9f9611f9a563b56701c3b57be8401865edd4fdd5dbb8b25ce6f1c39"
+  },
+  {
+    "local_path": "sources/arrhythmia/patches/src/trackmodes.c",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "patches/src/trackmodes.c",
+    "sha256": "fb5776069483e9684eb023fc201e250ecab033d875b461ab518d5b15aed75558"
+  },
+  {
+    "local_path": "sources/arrhythmia/tools/build_lightshow.py",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "tools/build_lightshow.py",
+    "sha256": "fbaeb22e1e8577d91fb5d56a87225dab59ea8aaf140700506416ea575caa0881"
+  },
+  {
+    "local_path": "sources/arrhythmia/tools/patch.py",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "tools/patch.py",
+    "sha256": "8474630495026d2833b85d4df61e3282416974732859b2c284c157f6deb9ba33"
+  },
+  {
+    "local_path": "sources/arrhythmia/tools/syx.py",
+    "repo": "llcoolkm/arrhythmia",
+    "ref": "a1d7a3f2bdfdf8045ddbb2a4b26fef73b29b6ff2",
+    "path": "tools/syx.py",
+    "sha256": "a8d0d38eb315f75f6381ed521e5d7155f2ec545f9db038d63b3de1a54f31b2ef"
+  },
+  {
+    "local_path": "sources/cr_stereo/LICENSE",
+    "repo": "jsmith13/cr_stereo",
+    "ref": "e88a11e772de80804015c34693658e497e4e890b",
+    "path": "LICENSE",
+    "sha256": "c3cdaa184b82b5e67b8417cf362bd3204d6a537f7e671d41b7fb1e183c98aa25"
+  },
+  {
+    "local_path": "sources/cr_stereo/extract_firmware.py",
+    "repo": "jsmith13/cr_stereo",
+    "ref": "e88a11e772de80804015c34693658e497e4e890b",
+    "path": "tools/extract_firmware.py",
+    "sha256": "900456870ae84a830b3c2dfe3f90817ff513ab0cc5de1cc4e3f9bf6dbad2b0c5"
+  }
+]
