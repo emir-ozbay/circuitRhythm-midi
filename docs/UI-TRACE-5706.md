@@ -26,15 +26,20 @@ Kod adresleri çift; vtable içindeki Thumb pointer'ları tek sayılıdır.
 | Grid container | vtable `0x080678DC`; press `0x0804D7A0`, release `0x0804D7DE` | D; `+0x228` tutulan pad maskesi; iki yol da seçici ve indeks dönüşümünü çağırır |
 | Seçili track | `0x0805800E` → `[grid+0x25C]` store p0, `0x0803FC58` ile okuma | D+E; track 0 ve 7. Mutlak grid RAM adresi `0x20048B9C` yalnızca K; gerçek cihaz nesnesi ölçülmedi |
 | Alt görünüm seçimi | `0x0804DC86`: pad <16 → `0x0804DC50`, diğerleri → `0x0804DBDC`; mode `[grid+0x264]` | D+E; mode 0/2/3 ve iki uç track. Bu modlarda üst görünüm `[grid+0x74+4*track]`; alt görünüm sırasıyla `+0x14`, `+0x9C`, `+0xBC` |
+| Üst görünüm tablosu | `0x0804DC50`: `tbb [pc, r2]`; mode 0/2/3'te `[grid+0x74+4*track]` (Step View) döner | D+E; track ve mode'a göre üst subview pointer'ını çözümler |
+| Alt görünüm tablosu | `0x0804DBDC`: `tbb [pc, r2-1]`; mode 0'da `0x0804DC46` dalıyla `[grid+0x14+4*track]` döner | D+E; mode 0/2/3 alt subview (Note/Sample vb.) pointer'ını çözümler |
 | Container pad dönüşümü | `0x0804DF3E` | D+E; üst pad aynı kalır; test edilen mode 2/3 alt pad'den 16 çıkarır. Mode 0 alt bölümde ayrıca kendi sayfa durumunu ekler. Tüm mode'lar için tek eşleme varsayılmaz |
 | Gerçek step görünümü kurulumu | grid constructor `0x0804C632` → factory `0x0805594C`; `0x0804C638..646` sekiz pointer'ı grid+0x74'e kopyalar; factory `0x08055A42` → ctor `0x0805C980` | D; ctor `r1=32` ile `0x080520D8` çağırır. Heap/constructor çalışması emüle edilmedi |
 | Step görünümü vtable | `0x080682CC`: press `0x0805CB05`, release `0x0805CCF1`; LED slot `0x080682E8` → `0x0805D3BD` | D; observer alt nesnesi +8, vtable `0x080682F8` → `0x0805D093` |
 | Step press | `0x0805CB04` | D+E; `0x805d020` ile timer 3 durdurulur; `[view+0x60]` p0 != 0 ise pad'e 16 eklenir; `view+0x20` w1 set; `view+0x74+2*step` durum bit 3 (held) set; `0x805cf24` ile LED palet 31 (parlak beyaz) hesaplanır; `[view+0x18]` w1'e step yazılır ve notify edilir; timer 6 başlatılır (300 ms, callback `0x0805ce49`); `[view+0xb8]` (bekleyen toggle) ve `[view+0xc0]` (basılı pad) maskelerinde `1 << step` set edilir |
 | Step release | `0x0805CCF0` | D+E; aynı +16 dönüşümü; `[view+0xc0]` maskesinden bit temizlenir; `[view+0xb8]` biti 1 ise (300 ms dolmadan kısa bırakış) `0x0805d610` ile normal step toggle çağrılır; `view+0x18` w1 == step ise timer 6 durdurulur; `view+0x20` w0=0 yazılıp notify edilir; observer (`0x0805d094` -> `0x0805d3f8` -> `0x0805cffe`) bit 3'ü temizler ve LED'i günceller; `0x805d020` çağrılır |
+| Step mod/clear denetleyicisi | `0x0805D020` | D+E; `[view+0xB4]` != 0 ise `[view+0x38]` callback'ini çağırır ve `0xB4`'ü sıfırlar; timer 3 durdurulur. `step >= 32` durumunda `view+0x74+2*32` doğrudan bu baytı ezer ve kontrol yapısını bozar |
 | Held timeout callback | `0x0805CE48` | D+E; timer 6 callback'i (300 ms); `[view+0xb8]` pending toggle maskesinden `[view+0xc0]` basılı bitleri temizler (`bics`); böylece uzun basışta bırakma anında toggle tetiklenmez, step parametre düzenleme moduna (`view+0x68`) girilir |
 | Step durum biti yardımcısı | `0x0805CFFE` | D+E; `(view, step, bit_index, val)`; `view+0x74+2*step` içindeki istenen biti set/clear eder ve `0x0805cf24` ile LED'i yeniden hesaplar |
 | Release durum temizleyici | `0x0805D3F8` | D+E; observer'dan `view+0x20` bildirimi geldiğinde çağrılır; `view+0x20` w0 değerini (0) alıp `0x0805cffe` aracılığıyla bit 3'ü (held) temizler |
 | Normal step toggle | `0x0805D610` → hit varsa `0x0805D5C2`, yoksa `0x0805D588` | D+E; ST1=`[view+0xC]`, ST2=`[view+0x10]`. Sonunda ST2 ve ST1 notify edilir. Oluşturma velocity 96, microstep mask 1, probability 7, sample flip FF, nota `[view+0x5C]` p0, gate 6, flags 0 |
+| ST1 parametre yazıcıları | `0x080549B0` (Velocity), `0x08054A04` (Probability), `0x080549D8` (Microstep), `0x08054A30` (Sample Flip) | D+E; `step >> 2` ile word hesabı yapar. `step=32` yazımı Velocity yerine Probability[0]'ı bozar |
+| ST2 parametre yazıcıları | `0x08054A5C` (Note), `0x08054A84` (Gate), `0x08054AB0` (Flags) | D+E; `step >> 2` ile word hesabı yapar. `step=32` yazımı Note yerine Gate[0]'ı bozar |
 | Held sample yolundaki oluşturma | `0x0805E41A` → `0x0805E5A0`, observer `0x0805E3B0` | D; önceki rapordaki bu hook normal step toggle'ın yerine geçmez. Farklı nesne/alan düzeni vardır |
 | Word okuyucu/yazıcı | `0x0803FC58` / `0x0803FD26` | D+E; aktif seçim word başına bir bittir; tek global buffer seçimi gibi modellenmemeli |
 | Notify | `0x0803FBEC` | D+E; `active_mask ^= dirty_mask`; `[store+0x14]` listesindeki maskesi eşleşen listener slot 0'ları çağırır, ardından dirty'yi temizler |
@@ -74,6 +79,22 @@ Kod adresleri çift; vtable içindeki Thumb pointer'ları tek sayılıdır.
      o an seçili olan Track 1 view'ına iletir (`view1`). Track 1 bu adımı hiç basmadığı için tepkisiz kalır;
      Track 0 view'ı release olayını hiç almadığı için step 0'ın sahipliği Track 0 üzerinde "öksüz" (orphaned) olarak basılı kalır.
 
+`tests/test_step_routing.py` beş ek yönlendirme ve sınır güvenliği testi içerir:
+
+1. `test_stock_container_routing_split`: Stok grid container pad yönlendirme ve yerel pad dönüşümü doğrulaması (`0x0804DC86` ve `0x0804DF3E`). Pad < 16 üst görünüme (Step View), pad >= 16 alt görünüme (Note/Sample) gider; Mode 0 sayfa 0'da pad-16, sayfa 1'de ise +16 eklenerek pad olarak döner.
+2. `test_step_index_overflow_hazard_and_corruption_proof`: `step >= 32` durumunda stok ikilide oluşan üç kritik bellek bozulmasının matematiksel ve emülasyon kanıtı:
+   - Durum dizisi taşması (`view + 0x74 + 2 * 32 = view + 0xB4`): Durum biti 3 (held, `0x08`), `view + 0xB4` ikincil kontrol/temizleme baytını ezer. `0x0805D020` sonraki basışta `view + 0x38` fonksiyon göstericisini çalıştırmaya çalışarak unmapped bellek hatasına ve sistem çökmesine yol açar.
+   - ST2 Note parametre bozulması (`0x08054A5C`): `step=32` yazımı (`step >> 2 = 8`) word 8'e denk gelerek Step 0'ın Gate uzunluğunu ezer ve pattern belleğine bozuk commit eder.
+   - ST1 Velocity parametre bozulması (`0x080549B0`): `step=32` yazımı (`step >> 2 = 8`) word 8'e denk gelerek Step 0'ın Probability değerini ezer ve pattern belleğine bozuk commit eder.
+3. `test_safe_32pad_full_lifecycle_all_steps`: 32-pad Sequencer Modu yönlendirmesinin tam yaşam döngüsü doğrulaması:
+   - Tüm 32 pad (`0..31`) doğrudan Step View'a yönlendirilir ve sayfa ofseti 0 kilitlenir (`step == pad`).
+   - 32 adımın tamamında (0..31) Cycle 1 (açma) ve Cycle 2 (kapatma) eksiksiz sınanır.
+   - `view + 0xB4` kontrol bloğu hiçbir adımda bozulmaz (kesin sıfır kalır).
+   - Pattern belleğine 32 adımın 32'si de eksiksiz ve hatasız yazılır/temizlenir.
+   - LED renk dizisi 32 adım için doğru palet değerlerine güncellenir.
+4. `test_cross_boundary_concurrent_press_and_release`: Üst/alt yarı sınırında (pad 15 ve 16) eşzamanlı basış doğrulaması. `view + 0xC0` held maskesinin birden fazla biti aynı anda başarıyla koruduğu ve ardışık bırakışlarda adımların bağımsız commit edildiği kanıtlanır.
+5. `test_routing_guard_clamping_prevents_overflow`: Sınır maskelemesi (`pad & 0x1F`) ile 32, 47, 63, 127 gibi sınır dışı değerlerin Step View'a geçmeden güvenle sınırlandığı ve `view + 0xB4` bölgesini asla bozmadığı doğrulanır.
+
 Son zincirlerde RTOS timer kuyrukları (`0x08046dde` / `0x08046e2a`) `bx lr` ile yalıtılmış, tetiklenen timer id ve callback'leri
 hook ile izlenmiştir. Diğer UI, toggle, notify, commit ve observer mekanizmaları stock kod ile çalıştırılmıştır.
 Nesneler ve listener bağlantıları sentetik olarak kuruldu; bu, stock constructor'ların gerçek cihazda aynı anda kurduğu
@@ -85,12 +106,21 @@ Testler 64 adım uygulaması değildir. Sekiz pattern bloğu fixture olarak koru
 Pad `0..31`, alt görünümün aldığı pad, yerel step `0..31`, mantıksal step ve playback cursor ayrı tutulmalı.
 Stock üst 16 pad route'u aynı track'in step view'ına gider; step view kendi içinde sayfa offset'i ekler.
 Yeni 32-pad görünümünde alt yarıyı step view'a yönlendirmek tek başına yetmez: bu +16 hem press hem release için
-kontrol edilmezse yanlış step/32 üstü indeks oluşabilir. LED tarafında da getter penceresi ve container'ın iki kaynaklı
-kopyası birlikte ele alınmalı. Sayfa store'unu zorla sıfırlamak diğer görünümleri, tutulan step'i veya playback'i
-etkilemeyeceği kanıtlanmadan uygulanmamalı.
-Ayrıca, basılı tutarken track/sayfa değiştirilmesinde container seviyesinde basılı tutulan pad'lerin hangi subview'a ait
-olduğunu takip eden bir sahiplik tablosu (ownership table) veya görünüm değişiminde temizleme (cleanup) ihtiyacı
-32 pad düzeninde dikkate alınmalıdır.
+kontrol edilmezse yanlış step/32 üstü indeks oluşabilir.
+Yapılan testler ve disassembly analizi şu kesin mimari sınırları ortaya çıkarmıştır:
+1. **Step View Nativ 32 Adım Destekler:** Step View bellek yapısı (`view + 0x74..0xB2` durum dizisi, `view + 0xB8` pending maskesi, `view + 0xC0` held maskesi, 64-baytlık LED buffer'ı ve ST1/ST2 32-entry tamponları) 32 adımı yerel olarak zaten desteklemektedir.
+2. **Sayfa Ofseti Çiftlenmesi Felakettir:** Alt 16 pad (`16..31`) Step View'a aktarılırken, eğer Step View kendi içindeki sayfa ofsetini (`[view + 0x60] != 0` -> `step += 16`) uygulamaya devam ederse, `step = 16..31 + 16 = 32..47` oluşur.
+3. **step >= 32 Sonuçları Kesin Olarak Kanıtlanmıştır:**
+   - `view + 0xB4` ezilerek `0x0805D020` üzerinden crash oluşturur.
+   - `1 << step` 32-bit kaydırmada sıfırlanır, maskeler tutarsızlaşır.
+   - `st1` ve `st2` dizilerinde parametreler birbirinin üzerine yazılır (Note 32, Gate 0'ı; Velocity 32, Probability 0'ı bozar).
+   - Pattern commit (`0x08048208`) döngüsü yalnızca 32 adımı (`0..31`) işlediğinden, 32 ve üzeri adımlar bellekte kalıcı kirlilik bırakır ama asla diske/pattern'e düzgün yazılamaz.
+4. **Çözüm Mimarisi:**
+   - Sequencer Only (32 Pad) modunda: Grid Container tüm pad'leri (`0..31`) Step View'a yönlendirir.
+   - Step View'a gelen pad doğrudan adım indeksi olarak ele alınır (`step == pad`).
+   - Step View için sayfa ofseti sıfıra sabitlenir / izole edilir.
+   - Yönlendirme katmanında `pad & 0x1F` sınır maskesi uygulanarak 31 üstü indeks geçişi donanımsal/yazılımsal olarak kesin engellenir.
+   - LED tarafında ise Grid Composite (`0x0804DD1C`), üst 16 pad için `buffer + 0`, alt 16 pad için `buffer + 0x20` kopyalayarak 32 adımın tamamını aynı ekranda birleştirir.
 
 ## Açık sorular ve elenen yorumlar
 
@@ -104,9 +134,9 @@ olduğunu takip eden bir sahiplik tablosu (ownership table) veya görünüm değ
   `view+0x20` store bildirimi üzerinden observer (`0x0805D094` -> `0x0805D3F8` -> `0x0805CFFE`) tarafından temizlendiği kanıtlandı.
 - Uzun basışın (hold) kısa basıştan (tap) nasıl ayrıldığı kanıtlandı: timer 6 callback'i (`0x0805CE48`, 300 ms),
   `view+0xB8` pending toggle maskesinden basılı pad'i temizleyerek bırakma anındaki toggle'ı iptal eder ve edit modunu açar.
+- `step >= 32` taşmasının Step View bellek bloklarını (`view + 0xB4`) ve ST1/ST2 parametre dizilerini nasıl tahrip ettiği sentetik testlerle kesin olarak kanıtlandı.
 - Gerçek controller/track/pattern nesnelerinin RTOS eşzamanlılığı, SD save/load ve fiziksel tarama zamanlaması açık.
 - Gate/tie, Mutate, Clear/Duplicate ve 1–16 düğmesi uzunluk gesture'ı ayrı kabul testleri gerektirir.
 - Mod kısayolu seçilmedi; ayrı Projects/Packs/MIDI-only davranışı uygulanmadı.
 
-Sonraki tek görev: M2 teknik adayının (docs/FIRST-PATCH-SCOPE.md: 0x0805CF68 palette 31 -> 30 tek komutluk LED tanı yaması)
-patch aracı, byte doğrulama kuralları ve tersine çevrilebilir diff testlerinin hazırlanması.
+Sonraki tek görev: Grid Container (`0x0804DC86` / `0x0804DF3E`) ve Step View sayfa ofseti için 32-pad yönlendirme mikro-yama tasarımının (M3/M4 hazırlığı) formüle edilmesi.

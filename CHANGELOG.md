@@ -1,5 +1,27 @@
 # Changelog
 
+## 32 Pad Step Yönlendirmesi (Routing), Sayfa Mantığı ve Taşma Koruması (Adım 4) — 2026-10-25
+- Grid Container alt/üst yönlendirmesi (`0x0804D7A0` / `0x0804D7DE`, `0x0804DC86`, `0x0804DF3E`) ve Step View sayfa ofseti (`0x0805CB04`, `0x0805CCF0`) detaylı incelendi.
+- Step View bellek yapısının (`view + 0x74..0xB2` durum dizisi, `view + 0xB8` pending maskesi, `view + 0xC0` held maskesi, 64 bayt LED tamponu, ST1 ve ST2 32-entry dizileri) 32 adımı yerel olarak zaten barındırdığı; sorunun Grid Container'ın `pad >= 16`'yı alt görünüme yönlendirmesi ve Step View'ın sayfa durumunda eklediği `+16` ofsetinden kaynaklandığı ortaya kondu.
+- `step >= 32` taşmasının yol açtığı kritik bellek bozulmaları Unicorn emülasyonu ve bayt analizleriyle kesin olarak kanıtlandı:
+  - Durum dizisi taşması (`view + 0x74 + 2 * 32 = view + 0xB4`): `view + 0xB4` kontrol baytı üzerine durum biti 3 (`0x08`) yazılır; `0x0805D020` sonraki basışta `view + 0x38` fonksiyon pointer'ını çağırıp unmapped bellek hatasına ve sistem çökmesine yol açar.
+  - ST2 parametre ezilmesi: `0x08054A5C` Note setter'ına `step=32` verildiğinde `step >> 2 = 8` hesaplamasıyla Word 8'e yazılır; bu da Step 0'ın Gate uzunluğunu ezer ve pattern belleğine bozuk commit edilir.
+  - ST1 parametre ezilmesi: `0x080549B0` Velocity setter'ına `step=32` verildiğinde Word 8'e yazılır; bu da Step 0'ın Probability değerini ezer ve pattern belleğine bozuk commit edilir.
+  - 64-baytlık LED renk buffer'ı sınır aşımı.
+- 32 Pad Sequencer Modu güvenli yönlendirme tasarımı formüle edildi:
+  - Tüm 32 pad (`0..31`) Step View'a yönlendirilir.
+  - Pad indeksi doğrudan adım indeksiyle 1:1 eşlenir (`step == pad`).
+  - Step View için sayfa ofseti 0'a sabitlenir / izole edilir.
+  - Yönlendirme katmanında `pad & 0x1F` maskesi uygulanarak 31 üstü geçersiz indeksler engellenir.
+- `tests/test_step_routing.py` test modülü eklendi (5 yeni kapsamlı test, toplam test sayısı 27'ye yükseldi; tüm testler PASS):
+  - `test_stock_container_routing_split`: Stok grid ayrımı ve sayfa dönüşümü.
+  - `test_step_index_overflow_hazard_and_corruption_proof`: `view + 0xB4`, ST1 ve ST2 bellek bozulma kanıtları.
+  - `test_safe_32pad_full_lifecycle_all_steps`: 32 adımın tamamında (0..31) ON ve OFF döngüleri, kontrol bloğu bütünlüğü, pattern commit ve LED palet güncellemeleri.
+  - `test_cross_boundary_concurrent_press_and_release`: Sınır ötesi (pad 15 ve 16) eşzamanlı basış/bırakış ve bağımsız commit doğrulaması.
+  - `test_routing_guard_clamping_prevents_overflow`: Sınır dışı girişlerin güvenli maskelenmesi.
+- `docs/UI-TRACE-5706.md` ve `docs/STATUS.md` güncellendi.
+- Fiziksel donanıma hiçbir erişim yapılmadı.
+
 ## M2 İlk Mikro Yama Adayının Sentetik Doğrulanması ve Cihaz Testi Teklifi (M2 Step 3) — 2026-10-25
 - Unicorn emülasyonu ile 32 adımın tamamında (adım 0..31) aynı RAM durumunda kapsamlı karşılaştırma yapıldı:
   - Basılan adımın 16-bit LED kaydının stok palet 31'den (`0x0055`) yamalı palet 30'a (`0x001E`) değiştiği doğrulandı.

@@ -1,6 +1,6 @@
 # Devralma durumu
 
-25 Ekim 2026. **M0 tamamlandı. M1 tamamlandı. M2 Adım 2 (Patcher Aracı) ve Adım 3 (M2 İlk Mikro Yama Adayının Sentetik Doğrulanması ve Cihaz Testi Teklifi) tamamlandı. Test edilen M2 adayı SysEx `build/` altında üretildi; fiziksel cihaza gönderilmedi.**
+25 Ekim 2026. **M0 tamamlandı. M1 tamamlandı. M2 Adım 2 (Patcher Aracı) ve Adım 3 (Sentetik Doğrulama ve Cihaz Testi Teklifi) tamamlandı. Adım 4 (32 Pad Step Yönlendirmesi, Sayfa Mantığı ve Taşma Koruması) tamamlandı.**
 Güncel sınır 32 adım; 64 adım, polifoni ve Elektron davranışları geliştirilmedi.
 
 ## Ortam ve bütünlük
@@ -16,38 +16,46 @@ Güncel sınır 32 adım; 64 adım, polifoni ve Elektron davranışları gelişt
 Proje kökünde PowerShell, venv ile:
 
 ```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe scripts/patch_firmware.py --candidate-m2
 .\.venv\Scripts\python.exe scripts/verify_m2_candidate.py
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe scripts/run_ui_audit.py
 .\.venv\Scripts\python.exe scripts/run_baseline.py
 ```
 
 | Test Paketi / Script | Sonuç | Gerçekte kanıtladığı |
 |---|---|---|
-| `scripts/patch_firmware.py --candidate-m2` | PASS | `build/circuitrhythm-5706-m2-candidate.syx` (SHA-256 `8c6996e22eec4848e31696f512ff4a9c0f151a76e37eb05837553c25743cc356`, CRC `0x2DBD7611`) ve manifest üretildi. İmajda yalnız 1 bayt değişti (`0x0805CF68`: `1f` -> `1e`). |
-| `scripts/verify_m2_candidate.py` | PASS | 32 adımın tamamında (0..31) Unicorn sentetik RAM emülasyonu: basılı adım LED'i palet 31'den 30'a değişti; kalan 31 LED, 20.800 baytlık pattern belleği ve edit buffer'ları %100 bayt bayt korundu. Rapor `logs/m2-verification-.../` altına yazıldı. |
+| `tests/test_step_routing.py` (5 test) | PASS (5/5) | Stok container yönlendirmesi, `step >= 32` taşma ve bellek bozulma kanıtları (`view+0xB4`, ST1/ST2 parametre ezilmeleri), güvenli 32-pad tam döngü (tüm 32 adım ON/OFF ve commit), sınır ötesi çoklu basış ve clamping maskeleme doğrulandı. |
 | `tests/test_patcher.py` (15 test) | PASS (15/15) | Güvenlik sınırları, bozuk hash reddi, çakışma engeli, kayıpsız roundtrip ve tam durum RAM emülasyonu (`test_pad_press_synthetic_ram_full_state_comparison`) doğrulandı. |
-| `tests/test_ui_contracts.py` (7 test) | PASS (7/7) | UI kontratları ve yaşam döngüsü regresyon görmedi. |
+| `tests/test_ui_contracts.py` (7 test) | PASS (7/7) | UI kontratları, step press/release yaşam döngüsü ve sahiplik sınırları regresyon görmedi. |
+| `scripts/verify_m2_candidate.py` | PASS | 32 adımın tamamında (0..31) Unicorn sentetik RAM emülasyonu: basılı adım LED'i palet 31'den 30'a değişti; kalan 31 LED ve 20.800 baytlık pattern belleği %100 korundu. |
+| `scripts/patch_firmware.py --candidate-m2` | PASS | `build/circuitrhythm-5706-m2-candidate.syx` (SHA-256 `8c6996e2...`, CRC `0x2DBD7611`) ve manifest üretildi. İmajda yalnız 1 bayt değişti (`0x0805CF68`: `1f` -> `1e`). |
 | `scripts/run_ui_audit.py` | PASS | UI audit sentetik RAM ve statik kanıtları doğrulandı (`logs/ui-audit-.../`). |
 | `scripts/run_baseline.py` | PASS | Host baseline testleri eksiksiz geçti (`logs/baseline-.../`). |
 
 ## Yeni kesin bulgular
 
-- **M2 Mikro Yamasının Sentetik İzolasyon Kanıtı:**
-  - Tek komutluk `0x0805CF68` (`movs r2, #31` -> `movs r2, #30`) yaması uygulandığında, imajda tam olarak 1 bayt değiştiği (`0x0805CF68`: `0x1F` -> `0x1E`), kalan 370.031 baytın stok ile birebir aynı kaldığı teyit edildi.
-  - Unicorn emülatöründe basılı adım durumunda (bit 3) stok imajın palet 31 (`0x0055`), yamalı imajın ise palet 30 (`0x001E`) renk kodunu yazdığı, 32 adımın tamamında (0..31) test edilerek kanıtlandı.
-  - Basış esnasında geriye kalan 31 adımın LED kayıtlarının kesinlikle etkilenmediği, 8 pattern'lik 20.800 bayt pattern belleğinin ve edit buffer'larının (`st1`, `st2`, `selection`, `note`) tek bir bayt dahi değişmeden korunduğu matematiksel olarak doğrulandı.
-  - Pad release (bırakma) sonrasında nota bilgisinin pattern belleğine stok kod ile birebir aynı şekilde commit edildiği ve LED'in aktif adım rengine döndüğü kanıtlandı.
-- **Cihaz Testi Teklifi ve Kurtarma Hazırlığı:**
-  - `docs/M2-DEVICE-TEST-PROPOSAL.md` oluşturuldu.
-  - Test SysEx dosya yolu, SHA-256 hash'leri, tek baytlık diff manifesti, donanım öncesi zorunlu yedekleme kontrol listesi (Components + SD kart tam imajı) ve resmî bootloader kurtarma adımları (Sample Rec + Sample + Note) belgelendi.
+- **Step View 32 Adım Nativ Kapasitesi:**
+  - Step View iç mimarisi (`view + 0x74..0xB2` durum sözcükleri, `view + 0xB8` bekleyen toggle maskesi, `view + 0xC0` basılı pad maskesi, 64-baytlık mantıksal LED tamponu, ST1 ve ST2 32-entry dizileri) 32 adımı (`0..31`) yerel olarak desteklemektedir.
+  - Stok kodda 16 adımla sınırlı kalınmasının yegane sebebi, Grid Container'ın (`0x0804DC86`) `pad >= 16`'yı alt görünüme yönlendirmesi ve Step View'ın (`0x0805CB04` / `0x0805CCF0`) sayfa durumuna göre (`[view + 0x60] != 0`) yerel pad'e `+16` ofset eklemesidir.
+- **İndeks Taşması (`step >= 32`) ve Bellek Tahribatı Kanıtı:**
+  - Eğer alt 16 pad (`16..31`) Step View'a yönlendirilirken sayfa ofseti (`+16`) uygulanırsa, `step = 16..31 + 16 = 32..47` indeksleri oluşur.
+  - Bu taşmanın doğurduğu üç kritik bellek hasarı Unicorn ile somut olarak kanıtlanmıştır:
+    1. `view + 0x74 + 2 * 32 = view + 0xB4`: Durum biti 3 (`0x08`), Step View'ın `0xB4` ikincil/temizleme kontrol baytını ezer. `0x0805D020` sonraki basışta `view + 0x38` fonksiyon pointer'ını çalıştırmayı deneyerek unmapped erişim hatası ve crash üretir.
+    2. ST2 Parametre Ezilmesi: Note setter'ı (`0x08054A5C`), `step=32` yazımında word hesabı (`32 >> 2 = 8`) sebebiyle Word 8'e yazar; bu da Step 0'ın Gate uzunluğudur. Pattern commit edildiğinde Step 0'ın Gate uzunluğu bozulur.
+    3. ST1 Parametre Ezilmesi: Velocity setter'ı (`0x080549B0`), `step=32` yazımında Word 8'e yazar; bu da Step 0'ın Probability değeridir. Pattern commit edildiğinde Step 0'ın Probability değeri bozulur.
+    4. LED buffer taşması: 64 baytlık tampon aşılır, heap'te bitişik alanlar ezilir.
+- **32-Pad Sequencer Modu Güvenli Yönlendirme Tasarımı:**
+  - Tüm 32 pad basışı (`0..31`) Step View'a aktarılır.
+  - Pad indeksi doğrudan adım indeksi olarak ele alınır (`step == pad`).
+  - Step View için sayfa ofseti sıfırlanır / izole edilir (`page == 0`).
+  - Yönlendirme katmanında `pad & 0x1F` maskesi uygulanarak 31 üstü indeks girişi kesin olarak engellenir.
+  - 32 adımın tamamında (0..31) ON ve OFF döngüleri, pattern commit ve LED palet güncellemeleri hatasız çalışır (`view + 0xB4` tamamen korunur).
 
 ## Değişen dosyalar
 
-- `tests/test_patcher.py` (genişletildi; `test_pad_press_synthetic_ram_full_state_comparison` eklendi, toplam 15 test)
-- `scripts/verify_m2_candidate.py` (yeni; M2 sentetik doğrulama runner'ı)
-- `docs/M2-DEVICE-TEST-PROPOSAL.md` (yeni; M2 cihaz testi teklifi, diff, hash ve recovery kontrol listesi)
+- `tests/test_step_routing.py` (yeni; 32 pad yönlendirme, sayfa mantığı ve taşma koruması testleri, 5 test)
+- `docs/UI-TRACE-5706.md` (güncellendi; adres haritası, yeni testler ve mimari sınırlar eklendi)
 - `CHANGELOG.md` (güncellendi)
 - `docs/STATUS.md` (güncellendi)
 
@@ -55,11 +63,10 @@ Geçici yapay çıktılar (`build/`, `logs/`) `.gitignore` altında korunmaktad�
 
 ## Başarısız denemeler ve açık sınırlar
 
-- 64 baytlık LED dizisi diff kontrolünde, hem palet 31 (`0x0055`) hem de palet 30 (`0x001E`) renk kodlarının yüksek baytı `0x00` olduğundan, 16-bit word farkı bayt seviyesinde 2 değil 1 baytlık fark (`step * 2`) oluşturmaktadır; test beklentisi buna göre netleştirildi.
+- `view + 0xB4` alanının kontrol yapısı incelenirken, bu alana doğrudan sahte değer yazıldığında `0x0805D020` fonksiyonunun `view + 0x38` pointer'ını çağırmaya çalıştığı ve çöktüğü görülmüştür; alanın normal durumda `0x00` kalması gerektiği kanıtlanmıştır.
 - Fiziksel cihaza hiçbir firmware gönderilmedi, komut iletilmedi veya MIDI/USB bağlantısı açılmadı.
-- Üretilen aday firmware'in bootloader tarafından kabul edilip edilmeyeceği veya cihaz açılışında kimlik bloğu uyuşmazlığına yol açıp açmayacağı fiziksel donanımda ölçülmemiştir.
-- Recovery prosedürleri donanım üzerinde fiilen icra edilmemiştir.
+- Testler sentetik RAM emülasyonu ile sınırlandırılmıştır; donanım tarama zamanlaması ve RTOS thread etkileşimi henüz fiziksel cihazda ölçülmemiştir.
 
 ## Sonraki tek somut görev
 
-M2 Adım 4: Kullanıcıdan onay alındığı takdirde, `docs/M2-DEVICE-TEST-PROPOSAL.md` yönergelerine uygun olarak yedeklerin alınması ve M2 adayının fiziksel cihaz üzerinde test edilmesi (kullanıcı onayı verilene kadar cihaza yükleme yapılmayacaktır).
+M3/M4 Hazırlığı: Grid Container (`0x0804DC86` / `0x0804DF3E`) ve Step View sayfa ofseti için 32-pad yönlendirme mikro-yama tasarımının formüle edilmesi ve sentetik testlerle doğrulanması.
