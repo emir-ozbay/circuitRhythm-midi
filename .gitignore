@@ -14,3 +14,8 @@ analysis/vendor/
 analysis/verification.json
 analysis/long-pattern-results.json
 analysis/selected-disassembly.txt
+dumps/
+captures/
+personal-projects/
+*.dump
+*.dmp

@@ -5,3 +5,6 @@
 *.ps1 text eol=crlf
 *.syx binary
 *.bin binary
+# Keep upstream evidence and reference snapshots byte-for-byte on checkout.
+analysis/** -text
+reference-results/** -text
