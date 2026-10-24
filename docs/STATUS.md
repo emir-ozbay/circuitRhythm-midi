@@ -64,7 +64,7 @@ Ayrıntılı kapsam, mock sınırları ve adres haritası: [UI-TRACE-5706.md](UI
 
 ## Değişen dosyalar
 
-`.gitattributes`, `.gitignore`, `CHANGELOG.md`, `docs/STATUS.md`, `tests/README.md`;
+`.gitattributes`, `.gitignore`, `CHANGELOG.md`, `docs/STATUS.md`, `tests/README.md`, `README.md`, `docs/SCOPE.md`;
 yeni `docs/UI-TRACE-5706.md`, `docs/FIRST-PATCH-SCOPE.md`, `scripts/inspect_ui.py`, `scripts/run_ui_audit.py`, `tests/test_ui_contracts.py`.
 Yeni test/analiz çıktıları ignored `logs/` altında; `.venv` ignored.
 Stock, baseline runner, eski analizler ve reference-results korunmuştur.

@@ -1,5 +1,10 @@
 # Changelog
 
+## Kapsam ve dokümantasyon senkronizasyonu — 2026-10-24
+- Proje köküne `README.md` eklendi; temel amaç, kapsam, mevcut teknik durum ve güvenlik kuralları güncellendi.
+- `docs/SCOPE.md` güncellendi ve ürün hedefleriyle birebir uyumlu hale getirildi.
+- `docs/STATUS.md` güncellendi.
+
 ## Yerel doğrulama ve M1 incelemesi — 2026-10-24
 - Windows Python 3.11.9 ortamında baseline tekrar üretildi; cihaz erişimi yapılmadı.
 - Stock pad routing, setter/notify/commit ve LED observer için sentetik RAM davranış testleri eklendi.
