@@ -290,6 +290,94 @@ class TestSyntheticRamExecutionOfPatchedCode(unittest.TestCase):
         u.mem_write(cell, struct.pack("<I", leds))
         return u, view, cell, leds
 
+    def _create_full_environment(self, image: bytes) -> tuple[Uc, dict]:
+        """Creates a fully configured synthetic step view environment with pattern memory,
+
+        edit stores, and observer chains for comprehensive stock vs patched comparison.
+        """
+        u = Uc(UC_ARCH_ARM, UC_MODE_THUMB | UC_MODE_MCLASS)
+        u.mem_map(0x08000000, 0x80000)
+        u.mem_write(APP_BASE, image)
+        # Stub timer start (0x08046dde) and stop (0x08046e2a) with bx lr (0x7047)
+        u.mem_write(0x08046dde, bytes.fromhex("7047"))
+        u.mem_write(0x08046e2a, bytes.fromhex("7047"))
+        u.mem_map(0x20000000, 0x50000)
+
+        view = 0x20002000
+        led_cell = 0x20003000
+        leds = 0x20003100
+        listener = 0x20001000
+        listeners = 0x20001100
+        view_listeners = 0x20001200
+        patterns = 0x20010000
+
+        # Non-empty 8-pattern test fixture (8 * 0xA28 = 20,800 bytes)
+        pattern_data = (bytes([60, 6, 1, 96, 7, 255, 0, 0]) * 32 + bytes([0x5A]) * (0xA28 - 256)) * 8
+        u.mem_write(patterns, pattern_data)
+
+        next_store = 0x20008000
+
+        def store(data, active=0):
+            nonlocal next_store
+            obj = next_store
+            next_store += 0x200
+            u.mem_write(obj, struct.pack("<5I", len(data) // 4, active, 0, obj + 0x40, obj + 0xC0))
+            u.mem_write(obj + 0x40, data)
+            u.mem_write(obj + 0xC0, data)
+            return obj
+
+        st1 = store(bytes([96]) * 32 + bytes([7]) * 32 + bytes([1]) * 32 + bytes([255]) * 32)
+        st2 = store(bytes([60]) * 32 + bytes([6]) * 32 + bytes(32))
+        selection = store(bytes([7, 0, 0, 0]))
+        note = store(bytes([60, 0, 0, 0]))
+        held = store(bytes([255, 0, 0, 0]) * 2)
+        pressed = store(bytes(8))
+        page = store(bytes(4))
+        zero_mod = store(bytes(4))
+
+        u.mem_write(listener, struct.pack("<I", 0x080696A0))
+        for off, val in ((4, patterns), (0x1C, st1), (0x20, st2), (0x28, selection)):
+            u.mem_write(listener + off, struct.pack("<I", val))
+
+        u.mem_write(listeners, struct.pack("<I", listener))
+        u.mem_write(listeners + 4, struct.pack("<I", 0xFFFFFFFF))
+        u.mem_write(listeners + 8, struct.pack("<I", view + 8))
+        u.mem_write(listeners + 12, struct.pack("<I", 0xFFFFFFFF))
+
+        u.mem_write(view_listeners, struct.pack("<I", view + 8))
+        u.mem_write(view_listeners + 4, struct.pack("<I", 0xFFFFFFFF))
+
+        for s, count, l_list in (
+            (st1, 2, listeners),
+            (st2, 1, listeners),
+            (pressed, 1, view_listeners),
+            (held, 1, view_listeners),
+        ):
+            u.mem_write(s + 1, bytes([count]))
+            u.mem_write(s + 0x14, struct.pack("<I", l_list))
+
+        u.mem_write(led_cell, struct.pack("<I", leds))
+        for off, val in (
+            (0, 0x080682CC), (4, led_cell), (8, 0x080682F8),
+            (0xC, st1), (0x10, st2), (0x18, held), (0x20, pressed),
+            (0x34, zero_mod), (0x3C, zero_mod), (0x40, zero_mod), (0x44, zero_mod),
+            (0x5C, note), (0x60, page), (0x64, held), (0x70, zero_mod)
+        ):
+            u.mem_write(view + off, struct.pack("<I", val))
+
+        u.mem_write(leds, bytes([0xA5]) * 64)
+        return u, {
+            "view": view,
+            "leds": leds,
+            "patterns": patterns,
+            "st1": st1,
+            "st2": st2,
+            "selection": selection,
+            "note": note,
+            "page": page,
+            "pattern_data": pattern_data,
+        }
+
     def _call(self, u: Uc, addr: int, *args):
         STOP = 0x0800F000
         regs = [UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3]
@@ -297,7 +385,7 @@ class TestSyntheticRamExecutionOfPatchedCode(unittest.TestCase):
             u.reg_write(reg, value)
         u.reg_write(UC_ARM_REG_SP, 0x2004F000)
         u.reg_write(UC_ARM_REG_LR, STOP | 1)
-        u.emu_start(addr | 1, STOP, count=1000)
+        u.emu_start(addr | 1, STOP, count=20000)
 
     def test_disassembly_at_patch_site(self):
         """Verifies disassembly of the instruction at 0x0805CF68 before and after patch."""
@@ -352,6 +440,115 @@ class TestSyntheticRamExecutionOfPatchedCode(unittest.TestCase):
                 unaffected_patched = [b for i, b in enumerate(u_patched.mem_read(leds_p, 64)) if i not in (step * 2, step * 2 + 1)]
                 self.assertEqual(unaffected_stock, [0xA5] * 62)
                 self.assertEqual(unaffected_patched, [0xA5] * 62)
+
+    def test_pad_press_synthetic_ram_full_state_comparison(self):
+        """Executes full pad press (0x0805CB04) and release (0x0805CCF0) dispatch in synthetic RAM.
+
+        Proves that:
+        1. Only the pressed step's 16-bit LED record changes from palette 31 (0x0055) to 30 (0x001E).
+        2. All remaining 31 LED records remain completely untouched and byte-identical between stock and patched.
+        3. All 8 patterns of pattern memory (8 * 0xA28 = 20,800 bytes) remain byte-for-byte untouched and identical.
+        4. All edit buffers (st1, st2, selection, note) remain byte-for-byte identical.
+        5. Upon pad release, commit and active step LED updates are byte-for-byte identical.
+        """
+        palette_31_color = bytes([0x55, 0x00])  # Palette index 31 word 0x0055 (little-endian)
+        palette_30_color = bytes([0x1E, 0x00])  # Palette index 30 word 0x001E (little-endian)
+
+        for step in range(32):
+            with self.subTest(step=step):
+                u_stock, env_s = self._create_full_environment(self.stock_image)
+                u_patched, env_p = self._create_full_environment(self.patched_image)
+
+                page_idx = step // 16
+                pad = step % 16
+
+                # Set page in both emulators
+                u_stock.mem_write(env_s["page"] + 0x40, bytes([page_idx, 0, 0, 0]))
+                u_patched.mem_write(env_p["page"] + 0x40, bytes([page_idx, 0, 0, 0]))
+
+                # 1. Action: Pad Press (0x0805CB04)
+                self._call(u_stock, 0x0805CB04, env_s["view"], pad, 96)
+                self._call(u_patched, 0x0805CB04, env_p["view"], pad, 96)
+
+                led_s = bytes(u_stock.mem_read(env_s["leds"], 64))
+                led_p = bytes(u_patched.mem_read(env_p["leds"], 64))
+
+                # Assertion 1: Only the pressed step's LED word differs (palette 31 vs palette 30)
+                step_led_s = led_s[step * 2 : step * 2 + 2]
+                step_led_p = led_p[step * 2 : step * 2 + 2]
+                self.assertEqual(step_led_s, palette_31_color, f"Step {step}: stock must be palette 31")
+                self.assertEqual(step_led_p, palette_30_color, f"Step {step}: patched must be palette 30")
+                self.assertNotEqual(step_led_s, step_led_p)
+
+                # Assertion 2: The remaining 31 LED entries are completely untouched and identical
+                for other in range(32):
+                    if other != step:
+                        self.assertEqual(
+                            led_s[other * 2 : other * 2 + 2],
+                            bytes([0xA5, 0xA5]),
+                            f"Step {step}: stock other step {other} modified",
+                        )
+                        self.assertEqual(
+                            led_p[other * 2 : other * 2 + 2],
+                            bytes([0xA5, 0xA5]),
+                            f"Step {step}: patched other step {other} modified",
+                        )
+                # Verify that across all 64 bytes of LED records, diff is strictly at byte step * 2
+                # (Since high byte of both palette 31 [0x0055] and palette 30 [0x001E] is 0x00)
+                led_diff_indices = [i for i in range(64) if led_s[i] != led_p[i]]
+                self.assertEqual(led_diff_indices, [step * 2])
+
+                # Assertion 3: Pattern memory (all 8 patterns = 20,800 bytes) is untouched and byte-identical
+                pattern_bytes_s = bytes(u_stock.mem_read(env_s["patterns"], 8 * 0xA28))
+                pattern_bytes_p = bytes(u_patched.mem_read(env_p["patterns"], 8 * 0xA28))
+                self.assertEqual(pattern_bytes_s, env_s["pattern_data"])
+                self.assertEqual(pattern_bytes_p, env_p["pattern_data"])
+                self.assertEqual(pattern_bytes_s, pattern_bytes_p)
+
+                # Assertion 4: Edit buffers are byte-for-byte identical
+                self.assertEqual(
+                    bytes(u_stock.mem_read(env_s["st1"], 0x100)),
+                    bytes(u_patched.mem_read(env_p["st1"], 0x100)),
+                )
+                self.assertEqual(
+                    bytes(u_stock.mem_read(env_s["st2"], 0x100)),
+                    bytes(u_patched.mem_read(env_p["st2"], 0x100)),
+                )
+                self.assertEqual(
+                    bytes(u_stock.mem_read(env_s["selection"], 0x20)),
+                    bytes(u_patched.mem_read(env_p["selection"], 0x20)),
+                )
+
+                # Assertion 5: Step status word (view + 0x74 + 2 * step) has bit 3 set (value 8) in both
+                status_s = struct.unpack("<H", u_stock.mem_read(env_s["view"] + 0x74 + 2 * step, 2))[0]
+                status_p = struct.unpack("<H", u_patched.mem_read(env_p["view"] + 0x74 + 2 * step, 2))[0]
+                self.assertEqual(status_s, 8)
+                self.assertEqual(status_p, 8)
+
+                # 2. Action: Pad Release (0x0805CCF0) - toggles ON and commits
+                self._call(u_stock, 0x0805CCF0, env_s["view"], pad)
+                self._call(u_patched, 0x0805CCF0, env_p["view"], pad)
+
+                # Post-release Assertion: Commit to pattern memory is byte-for-byte identical
+                rel_pattern_s = bytes(u_stock.mem_read(env_s["patterns"], 8 * 0xA28))
+                rel_pattern_p = bytes(u_patched.mem_read(env_p["patterns"], 8 * 0xA28))
+                self.assertEqual(rel_pattern_s, rel_pattern_p)
+
+                # Post-release Assertion: Active step LED is byte-for-byte identical
+                rel_led_s = bytes(u_stock.mem_read(env_s["leds"], 64))
+                rel_led_p = bytes(u_patched.mem_read(env_p["leds"], 64))
+                self.assertEqual(rel_led_s, rel_led_p)
+                self.assertNotEqual(rel_led_s[step * 2 : step * 2 + 2], bytes([0xA5, 0xA5]))
+
+                # Post-release Assertion: Edit buffers remain byte-for-byte identical
+                self.assertEqual(
+                    bytes(u_stock.mem_read(env_s["st1"], 0x100)),
+                    bytes(u_patched.mem_read(env_p["st1"], 0x100)),
+                )
+                self.assertEqual(
+                    bytes(u_stock.mem_read(env_s["st2"], 0x100)),
+                    bytes(u_patched.mem_read(env_p["st2"], 0x100)),
+                )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,16 @@
 # Changelog
 
+## M2 İlk Mikro Yama Adayının Sentetik Doğrulanması ve Cihaz Testi Teklifi (M2 Step 3) — 2026-10-25
+- Unicorn emülasyonu ile 32 adımın tamamında (adım 0..31) aynı RAM durumunda kapsamlı karşılaştırma yapıldı:
+  - Basılan adımın 16-bit LED kaydının stok palet 31'den (`0x0055`) yamalı palet 30'a (`0x001E`) değiştiği doğrulandı.
+  - Geriye kalan 31 adımın LED kayıtlarının bayt bayt korunduğu ve stok ile aynı kaldığı kanıtlandı.
+  - 8 pattern'in tamamını içeren 20.800 baytlık pattern belleğinin ve edit buffer'larının (`st1`, `st2`, `selection`, `note`) basış sırasında tek bir bayt dahi değişmeden korunduğu kanıtlandı.
+  - Bırakma (release) döngüsünde `0x0805CCF0` fonksiyonunun stok ve yamanmış firmware'de aynı şekilde pattern belleğine nota commit ettiği ve LED'leri aktif adım rengine güncellediği bayt bayt kanıtlandı.
+- `tests/test_patcher.py` içine `test_pad_press_synthetic_ram_full_state_comparison` testi eklendi (patcher testleri 15'e, test paketi toplamı 22'ye yükseldi; tüm testler PASS).
+- `scripts/verify_m2_candidate.py` geliştirildi; hash, binary diff, vektör tablosu ve 32 adımlık Unicorn emülasyonu çalıştırılarak `logs/m2-verification-<timestamp>/verification_report.json` raporu üretildi.
+- `docs/M2-DEVICE-TEST-PROPOSAL.md` belgesi hazırlandı; test SysEx'i (`build/circuitrhythm-5706-m2-candidate.syx`, SHA-256 `8c6996e2...`), diff/manifest ayrıntıları, donanım öncesi yedekleme önkoşulları ve kurtarma adımları dokümante edildi.
+- Fiziksel cihaza hiçbir firmware gönderilmedi veya donanım erişimi yapılmadı.
+
 ## Güvenli Firmware Yama (Patcher) Aracı ve Testleri (M2 Step 2) — 2026-10-24
 - `scripts/patch_firmware.py` geliştirildi:
   - Giriş SysEx dosyasının SHA-256 (`11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf`) ve çıkarılan binary imaj hash'inin zorunlu doğrulanması sağlandı; geçersiz veya bozuk girdiler reddedildi.
