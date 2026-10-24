@@ -213,6 +213,217 @@ class Contracts(unittest.TestCase):
             expected[step * 2:step * 2 + 2] = self.image[palette - BASE + 31 * 2:palette - BASE + 32 * 2]
             self.assertEqual(self.u.mem_read(leds, 64), expected)
 
+    def test_step_press_release_lifecycle_and_boundary_steps(self):
+        # Stub timer start (0x08046dde) and stop (0x08046e2a) with bx lr (0x7047).
+        # Timer behavior is observed via hooks; RTOS queue internals are out of scope.
+        self.u.mem_write(0x08046dde, bytes.fromhex("7047"))
+        self.u.mem_write(0x08046e2a, bytes.fromhex("7047"))
+
+        timer_starts, timer_stops = [], []
+
+        def on_timer(uc, addr, size, data):
+            if addr == 0x08046dde:
+                timer_starts.append((
+                    uc.reg_read(UC_ARM_REG_R0),  # timer id
+                    uc.reg_read(UC_ARM_REG_R1),  # mode
+                    uc.reg_read(UC_ARM_REG_R2),  # duration ms
+                    uc.reg_read(UC_ARM_REG_R3),  # callback
+                ))
+            elif addr == 0x08046e2a:
+                timer_stops.append(uc.reg_read(UC_ARM_REG_R0))
+
+        hook = self.u.hook_add(UC_HOOK_CODE, on_timer)
+
+        view, led_cell, leds = 0x20002000, 0x20003000, 0x20003100
+        listener, listeners, patterns = 0x20001000, 0x20001100, 0x20010000
+        view_listeners = 0x20001200
+        empty = bytes([0, 6, 0, 0, 7, 255, 0, 0]) * 32 + bytes([0xA5]) * (0xA28 - 256)
+        st1 = self.store(bytes(32) + bytes([7]) * 32 + bytes(32) + bytes([255]) * 32)
+        st2 = self.store(bytes(32) + bytes([6]) * 32 + bytes(32))
+        selection = self.store(bytes([7, 0, 0, 0]))
+        note = self.store(bytes([60, 0, 0, 0]))
+        held = self.store(bytes([255, 0, 0, 0]) * 2)
+        pressed = self.store(bytes(8))
+        page = self.store(bytes(4))
+        zero_mod = self.store(bytes(4))
+
+        self.word(listener, 0x080696A0)
+        for offset, value in ((4, patterns), (0x1C, st1), (0x20, st2), (0x28, selection)):
+            self.word(listener + offset, value)
+
+        self.word(listeners, listener)
+        self.word(listeners + 4, 0xFFFFFFFF)
+        self.word(listeners + 8, view + 8)
+        self.word(listeners + 12, 0xFFFFFFFF)
+
+        self.word(view_listeners, view + 8)
+        self.word(view_listeners + 4, 0xFFFFFFFF)
+
+        for s, count, l_list in ((st1, 2, listeners), (st2, 1, listeners),
+                                 (pressed, 1, view_listeners), (held, 1, view_listeners)):
+            self.u.mem_write(s + 1, bytes([count]))
+            self.word(s + 0x14, l_list)
+
+        self.word(led_cell, leds)
+        for offset, val in (
+            (0, 0x080682CC), (4, led_cell), (8, 0x080682F8),
+            (0xC, st1), (0x10, st2), (0x18, held), (0x20, pressed),
+            (0x34, zero_mod), (0x3C, zero_mod), (0x40, zero_mod), (0x44, zero_mod),
+            (0x5C, note), (0x60, page), (0x64, held), (0x70, zero_mod)
+        ):
+            self.word(view + offset, val)
+
+        self.u.mem_write(patterns, empty * 8)
+        palette = 0x08062AB0
+        pressed_color = self.image[palette - BASE + 31 * 2:palette - BASE + 32 * 2]
+
+        for page_val, pad, step in ((0, 0, 0), (0, 15, 15), (1, 0, 16), (1, 15, 31)):
+            with self.subTest(step=step, page=page_val, pad=pad):
+                self.u.mem_write(page + 0x40, bytes([page_val, 0, 0, 0]))
+                self.call(0x0805CF24, view, step)
+                off_colour = bytes(self.u.mem_read(leds + 2 * step, 2))
+
+                # Cycle 1: Press (held bit 3 set, bright white LED, 300ms timer started)
+                timer_starts.clear()
+                timer_stops.clear()
+                self.call(0x0805CB04, view, pad, 96)
+                status_press1 = struct.unpack('<H', self.u.mem_read(view + 0x74 + 2 * step, 2))[0]
+                self.assertEqual(status_press1, 8)  # bit 3 only
+                self.assertEqual(bytes(self.u.mem_read(leds + 2 * step, 2)), pressed_color)
+                self.assertEqual(len(timer_starts), 1)
+                self.assertEqual(timer_starts[0], (6, 0, 300, 0x0805CE49))
+                # Cycle 1: Release (toggle ON: hit bit 1 set, held bit 3 cleared, commit, timer stopped)
+                self.call(0x0805CCF0, view, pad)
+                status_rel1 = struct.unpack('<H', self.u.mem_read(view + 0x74 + 2 * step, 2))[0]
+                self.assertEqual(status_rel1, 2)  # bit 1 only (hit active)
+                led_rel1 = bytes(self.u.mem_read(leds + 2 * step, 2))
+                self.assertNotEqual(led_rel1, off_colour)
+                self.assertNotEqual(led_rel1, pressed_color)
+                self.assertIn(6, timer_stops)
+                expected = bytearray(empty * 8)
+                offset = 7 * 0xA28 + step * 8
+                expected[offset:offset + 8] = bytes([60, 6, 1, 96, 7, 255, 0, 0])
+                self.assertEqual(self.u.mem_read(patterns, len(expected)), expected)
+
+                # Cycle 2: Press (hit bit 1 + held bit 3 = 10, bright white LED)
+                self.call(0x0805CB04, view, pad, 96)
+                status_press2 = struct.unpack('<H', self.u.mem_read(view + 0x74 + 2 * step, 2))[0]
+                self.assertEqual(status_press2, 10)  # bits 1 and 3
+                self.assertEqual(bytes(self.u.mem_read(leds + 2 * step, 2)), pressed_color)
+
+                # Cycle 2: Release (toggle OFF: hit bit 1 cleared, held bit 3 cleared, empty pattern commit)
+                self.call(0x0805CCF0, view, pad)
+                status_rel2 = struct.unpack('<H', self.u.mem_read(view + 0x74 + 2 * step, 2))[0]
+                self.assertEqual(status_rel2, 0)
+                self.assertEqual(bytes(self.u.mem_read(leds + 2 * step, 2)), off_colour)
+                self.assertEqual(bytes(self.u.mem_read(patterns, 8 * 0xA28)), empty * 8)
+
+        self.u.hook_del(hook)
+
+    def test_step_ownership_on_page_and_track_change_while_held(self):
+        # Stub timers
+        self.u.mem_write(0x08046dde, bytes.fromhex("7047"))
+        self.u.mem_write(0x08046e2a, bytes.fromhex("7047"))
+
+        grid = 0x20001000
+        sel_track = self.store(bytes([0, 0, 0, 0]))
+        self.word(grid + 0x25C, sel_track)
+        self.u.mem_write(grid + 0x264, bytes([0]))  # mode 0
+
+        patterns = 0x20010000
+        empty = bytes([0, 6, 0, 0, 7, 255, 0, 0]) * 32 + bytes([0xA5]) * (0xA28 - 256)
+        self.u.mem_write(patterns, empty * 8)
+
+        views = []
+        pages = []
+        for t in (0, 1):
+            base = 0x20002000 + t * 0x1000
+            view = base
+            views.append(view)
+            led_cell, leds = base + 0x200, base + 0x300
+            listener, listeners = base + 0x400, base + 0x500
+            view_listeners = base + 0x600
+            st1 = self.store(bytes(32) + bytes([7]) * 32 + bytes(32) + bytes([255]) * 32)
+            st2 = self.store(bytes(32) + bytes([6]) * 32 + bytes(32))
+            selection = self.store(bytes([t, 0, 0, 0]))
+            note = self.store(bytes([60 + t, 0, 0, 0]))
+            held = self.store(bytes([255, 0, 0, 0]) * 2)
+            pressed = self.store(bytes(8))
+            page = self.store(bytes(4))
+            pages.append(page)
+            zero_mod = self.store(bytes(4))
+
+            self.word(listener, 0x080696A0)
+            for offset, value in ((4, patterns), (0x1C, st1), (0x20, st2), (0x28, selection)):
+                self.word(listener + offset, value)
+            self.word(listeners, listener)
+            self.word(listeners + 4, 0xFFFFFFFF)
+            self.word(listeners + 8, view + 8)
+            self.word(listeners + 12, 0xFFFFFFFF)
+
+            self.word(view_listeners, view + 8)
+            self.word(view_listeners + 4, 0xFFFFFFFF)
+
+            for s, count, l_list in ((st1, 2, listeners), (st2, 1, listeners),
+                                     (pressed, 1, view_listeners), (held, 1, view_listeners)):
+                self.u.mem_write(s + 1, bytes([count]))
+                self.word(s + 0x14, l_list)
+
+            self.word(led_cell, leds)
+            for offset, val in (
+                (0, 0x080682CC), (4, led_cell), (8, 0x080682F8),
+                (0xC, st1), (0x10, st2), (0x18, held), (0x20, pressed),
+                (0x34, zero_mod), (0x3C, zero_mod), (0x40, zero_mod), (0x44, zero_mod),
+                (0x5C, note), (0x60, page), (0x64, held), (0x70, zero_mod)
+            ):
+                self.word(view + offset, val)
+            self.word(grid + 0x74 + t * 4, view)
+
+        # -------------------------------------------------------------
+        # Part 1: Page change while held on Track 0 step view
+        # -------------------------------------------------------------
+        view0, page0 = views[0], pages[0]
+        # Press pad 5 on page 0 -> step 5 is held
+        self.call(0x0805CB04, view0, 5, 96)
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0], 8)
+        # Change page to page 1 while pad 5 is held
+        self.u.mem_write(page0 + 0x40, bytes([1, 0, 0, 0]))
+        # Release pad 5 on page 1 -> translates to step 21 (5 + 16)
+        # Step 21 was not pressed ([view+0xB8] bit 21 == 0), view+0x18 held (5) != 21 -> aborts
+        self.call(0x0805CCF0, view0, 5)
+        # Step 5 retains held state; step 21 untouched
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0], 8)
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 2 * 21, 2))[0], 0)
+        # Return to page 0 and release pad 5 -> translates to step 5, toggles ON cleanly
+        self.u.mem_write(page0 + 0x40, bytes([0, 0, 0, 0]))
+        self.call(0x0805CCF0, view0, 5)
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0], 2)
+        # Cleanly toggle step 5 back off
+        self.call(0x0805D610, view0, 5)
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0], 0)
+
+        # -------------------------------------------------------------
+        # Part 2: Track change while held on Grid container
+        # -------------------------------------------------------------
+        self.u.mem_write(grid + 0x228, bytes(4))  # clear grid held pad mask
+        # Track 0 selected: press pad 0 on grid container
+        self.u.mem_write(sel_track + 0x40, bytes([0, 0, 0, 0]))
+        self.call(0x0804D7A0, grid, 0, 96)
+        self.assertEqual(struct.unpack('<I', self.u.mem_read(grid + 0x228, 4))[0], 1)
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 0, 2))[0], 8)
+
+        # Change selected track to Track 1 while pad 0 is held
+        self.u.mem_write(sel_track + 0x40, bytes([1, 0, 0, 0]))
+        # Release pad 0 on grid container
+        self.call(0x0804D7DE, grid, 0)
+        # Grid held pad mask is cleared
+        self.assertEqual(struct.unpack('<I', self.u.mem_read(grid + 0x228, 4))[0], 0)
+        view1 = views[1]
+        # View 1 never had step 0 pressed; status remains 0
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view1 + 0x74 + 0, 2))[0], 0)
+        # View 0 never received release for pad 0; held ownership is orphaned on View 0
+        self.assertEqual(struct.unpack('<H', self.u.mem_read(view0 + 0x74 + 0, 2))[0], 8)
+
 
 if __name__ == "__main__":
     if sys.flags.optimize:

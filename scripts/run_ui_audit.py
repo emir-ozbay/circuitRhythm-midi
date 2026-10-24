@@ -15,7 +15,8 @@ from inspect_ui import BASE, EXPECTED, ROOT, load_image
 # Bounded diagnostic windows; embedded literal/table data is not executable proof.
 WINDOWS = ["080295b4:1a", "08040108:22", "0803d7fe:5c", "0804d7a0:86",
            "0804dc50:62", "0804df3e:44", "0805800e:10", "0804dd1c:13a",
-           "0805cb04:64", "0805ccf0:9c", "0805d588:b6", "0805cf24:da",
+           "0805cb04:64", "0805ccf0:9c", "0805ce48:3c", "0805cffe:22",
+           "0805d3f8:26", "0805d588:b6", "0805cf24:da",
            "0805d094:328", "0805d3bc:1a", "0803fbec:58", "08048208:1bc"]
 
 
@@ -47,8 +48,8 @@ def main():
         "result": "PASS", "utc": stamp, "python": sys.version, "platform": platform.platform(),
         "stock_sha256": EXPECTED, "image_sha256": hashlib.sha256(image).hexdigest(),
         "upstream_snapshots_verified": len(provenance),
-        "tests": "5 behavior tests; stock functions in synthetic RAM; dispatch callbacks mocked only in dispatch test",
-        "not_tested": ["physical pads/LEDs/MIDI", "RTOS concurrency", "full UI press/release lifecycle",
+        "tests": "7 behavior tests; stock functions in synthetic RAM; dispatch callbacks mocked only in dispatch test; timer start/stop stubbed to isolate RTOS queues",
+        "not_tested": ["physical pads/LEDs/MIDI", "RTOS concurrency and timer queues",
                        "save/load", "gate/tie lifetime", "Mutate", "bootloader/recovery"],
         "physical_device_accessed": False, "custom_firmware_built": False,
         "firmware_uploaded": False, "patch_applied": False,

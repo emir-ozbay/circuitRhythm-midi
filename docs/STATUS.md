@@ -1,6 +1,6 @@
 # Devralma durumu
 
-24 Ekim 2026. **M0 tamamlandı. M1'in ilk adres haritası ve dar davranış doğrulamaları tamamlandı; tam press/release yaşam döngüsü açık. M2 teknik aday kapsamı hazır, build yok.**
+24 Ekim 2026. **M0 tamamlandı. M1 (UI yaşam döngüsü, sınır adımları 0/15/16/31, basılı tutarken sayfa/track sahiplik doğrulamaları) tamamlandı. M2 teknik aday kapsamı hazır, build yok.**
 Güncel sınır 32 adım; 64 adım, polifoni ve Elektron davranışları geliştirilmedi.
 
 ## Ortam ve bütünlük
@@ -49,8 +49,8 @@ Ham dosya hash farkının nedeni Windows CRLF/LF farkıdır; referans dosyaları
 | 384 edit, 128 player argümanı | Önceki sayfalı host fixture; 64/128 adım firmware uygulaması değil |
 | 3456 microstep/probability senaryosu | Sentetik ön geçiş; RNG/clock/gate-tie yaşam döngüsü değil |
 
-**UI AUDIT PASS:** `logs/ui-audit-20261024T182014064195Z/`.
-Beş davranış testi geçti: pad dispatch; track/subview/index seçimi; setter-notify-commit; normal toggle-commit-LED observer; vtable ve basılı-adım renk dalı.
+**UI AUDIT PASS:** `logs/ui-audit-20261024T191624648565Z/`.
+Yedi davranış testi geçti: pad dispatch; track/subview/index seçimi; setter-notify-commit; normal toggle-commit-LED observer; vtable ve basılı-adım renk dalı; sınır adımları (0/15/16/31) press-release yaşam döngüsü; basılı tutarken sayfa/track değişimi sahiplik koruma testi.
 Ayrıntılı kapsam, mock sınırları ve adres haritası: [UI-TRACE-5706.md](UI-TRACE-5706.md).
 
 ## Yeni kesin bulgular
@@ -61,11 +61,15 @@ Ayrıntılı kapsam, mock sınırları ve adres haritası: [UI-TRACE-5706.md](UI
 - Notify `0x0803FBEC` dirty word'lerin aktif-buffer bitlerini çevirir; listener `0x08048208` seçili pattern'e 32 kaydı yazar. Sonraki edit'in önceki edit'i koruduğu gerçek çağrılarla doğrulandı.
 - Step view 32 mantıksal LED kaydı tutar; getter `0x0805D3BC` yalnızca 16'lık pencere sunar. Grid compositor `0x0804DD1C` üst/alt yarıyı farklı subview kaynaklarından birleştirir.
 - `0x0805CF68` basılı-adım renk komutunun `1f22` baytları ve hedef LED yazma davranışı doğrulandı. `1e22` adayının kapsamı [FIRST-PATCH-SCOPE.md](FIRST-PATCH-SCOPE.md) içinde; uygulanmadı.
+- **Tam press -> release yaşam döngüsü:** Sınır adımları 0, 15, 16 ve 31 için basış (durum bit 3, palet 31 beyaz LED, 300 ms timer 6 başlangıcı) ve bırakış (bekleyen basış maskesi `[view+0xB8]` kontrolü, toggle, pattern commit, durum bit 1 hit aktifleştirme, timer 6 durdurma ve `view+0x20` notify -> observer zinciriyle bit 3 temizleme) sentetik RAM'de Unicorn ile doğrulandı.
+- **Uzun basış (hold) ve kısa basış (tap) mekanizması:** Timer 6 callback'i (`0x0805CE48`, 300 ms), `view+0xB8` pending toggle maskesinden `[view+0xC0]` basılı pad bitlerini temizler (`bics`). Dolayısıyla 300 ms dolmadan bırakılırsa `0x0805D610` çağrılarak toggle yapılır; 300 ms aşılırsa bırakma anında toggle yapılmaz ve adım parametre düzenleme moduna girilir.
+- **Sahiplik (ownership) ve görünüm izolasyonu:**
+  - Sayfa değişirken bırakma: Sayfa 0'da basılı tutulan adım (ör. adım 5), kullanıcı basılı tutarken sayfa 1'e geçilip bırakıldığında +16 eklenerek adım 21 olarak yorumlanır. Adım 21 bekleyen maskede olmadığından toggle edilmez ve `view+0x18` eşleşmediğinden çıkılır; adım 5'in held durumu view'da korunur. Sayfa tekrar 0'a alınıp bırakıldığında adım 5 başarıyla açılır.
+  - Track değişirken bırakma: Grid container (`0x0804D7A0` / `0x0804D7DE`) fiziksel pad basılı maskesini `grid+0x228` alanında tutar. Track 0 seçiliyken pad basılıp, track 1'e geçildikten sonra bırakıldığında container fiziksel maskeyi temizler ancak release olayını aktif Track 1 view'ına gönderir. Track 0 view'ı release olayını hiç almadığı için step held sahipliği Track 0 üzerinde "öksüz" kalır.
 
 ## Değişen dosyalar
 
-`.gitattributes`, `.gitignore`, `CHANGELOG.md`, `docs/STATUS.md`, `tests/README.md`, `README.md`, `docs/SCOPE.md`;
-yeni `docs/UI-TRACE-5706.md`, `docs/FIRST-PATCH-SCOPE.md`, `scripts/inspect_ui.py`, `scripts/run_ui_audit.py`, `tests/test_ui_contracts.py`.
+`tests/test_ui_contracts.py`, `scripts/run_ui_audit.py`, `docs/UI-TRACE-5706.md`, `docs/STATUS.md`, `CHANGELOG.md`.
 Yeni test/analiz çıktıları ignored `logs/` altında; `.venv` ignored.
 Stock, baseline runner, eski analizler ve reference-results korunmuştur.
 
@@ -74,8 +78,9 @@ Stock, baseline runner, eski analizler ve reference-results korunmuştur.
 - `py -0p`: launcher yok. Python/venv sandbox erişimi ve Git index yazımı izinle çözüldü.
   CIM ortam sorguları erişim hatası verdi; OS/CPU bilgisi registry/Python'dan alındı. MIDI/USB envanteri sorgulanmadı.
 - Container mode 2/3 için ilk fixture ofseti yanlıştı; test başarısız oldu. TBB disassembly ile +0x9C/+0xBC olarak düzeltildi; test tekrar geçti.
+- Track değişimi testinde ilk synthetic RAM fixture'ında `listener` ve `led_cell` adresleri 0x20004000'de çakıştı ve `UC_ERR_INSN_INVALID` üretti; her track için `0x1000` aralıklı ve alt bileşenler için ayrık bellek blokları kurularak düzeltildi.
 - Başka bir 32-entry görünümü step view sanma hipotezi constructor zinciriyle elendi; PC-relative literal'deki ilk dört baytlık hizalama yanılgısı düzeltildi.
-- Tam cihaz emülatörü yok. Gerçek nesne başlangıcı, RTOS/listener eşzamanlılığı, held-pad sahipliği, timer, pressure, Clear/Duplicate, gate/tie, Mutate, SD ve MIDI timing ölçülmedi.
+- Tam cihaz emülatörü yok. Gerçek nesne başlangıcı, RTOS timer kuyrukları ve görev eşzamanlılığı, pressure, Clear/Duplicate, gate/tie, Mutate, SD ve MIDI timing ölçülmedi.
 - Cihazdaki firmware/bootloader ve yedek durumu bilinmiyor. Recovery fiziksel olarak denenmedi.
   Bu oturumda ARM toolchain kurulmadı veya upload paketi üretilmedi; build/transport kimliği ve stock'a dönüş kabulü açık.
 
@@ -84,6 +89,5 @@ Mod kısayolu, ayrı Projects, Packs engellemesi ve MIDI-only uygulaması henüz
 
 ## Sonraki tek somut görev
 
-M1 devamı: `0x0805CB04` press → `0x0805CCF0` release zincirini timer sınırlarını açıkça ayırarak sentetik fixture'da birleştir; 1/16/17/32 ve basılıyken sayfa/track değişiminde step sahipliğini doğrula.
-Ardından M2 adayını kontrollü patch aracı ve bağımsız diff testleriyle üretmek değerlendirilebilir.
+M2 hazırlığı: [docs/FIRST-PATCH-SCOPE.md](FIRST-PATCH-SCOPE.md) içinde tanımlanan tek komutluk `0x0805CF68` (palette 31 -> 30) LED tanı yaması için kontrollü binary patch script'i, orijinal bayt assert'i, range kontrolleri ve bağımsız diff testlerini oluşturmak.
 Cihaz testi ancak kesin dosya/hash, test ve recovery paketi hazırlandıktan sonra ayrı kullanıcı onayıyla yapılır.
