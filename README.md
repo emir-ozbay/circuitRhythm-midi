@@ -1,59 +1,45 @@
-# Circuit Rhythm MIDI Sequencer Modu
+# Circuit Rhythm 32-Adım MIDI Sequencer Modu
 
-Bu proje, Novation Circuit Rhythm (stok build 5706) firmware'i üzerinde çalışan, bağımsız ve güvenli bir MIDI Sequencer modifikasyonudur.
-
----
-
-## 1. Temel Amaç ve Ürün Hedefi
-
-Circuit Rhythm normalde sample tabanlı bir groovebox'tır. Bu projenin amacı:
-
-- **Harici MIDI Kontrolcüsü / Sequencer:** Cihazın dahili sample çalma motorundan bağımsız, harici synth ve ses modüllerini süren bir sequencer olarak çalışmasını sağlamak.
-- **Tek Ekranda 32 Adım:** Normalde 16'şar adımlık sayfalar (1–16 ve 17–32) halinde gezilen step sequencer'ı, 32 pad'in tamamını kullanarak aynı pattern'in 1–32 adımlarını tek bir ekranda aynı anda gösterecek ve düzenletecek hale getirmek.
+Bu proje, Novation Circuit Rhythm (stok build 5706) firmware'i üzerinde çalışan, cihazın normal sample groovebox işlevlerini koruyarak tek bir tuş kombinasyonuyla geçiş yapılabilen bağımsız bir **32-Adım MIDI Sequencer** modifikasyonudur.
 
 ---
 
-## 2. Kapsam ve Sınırlar
+## 1. Temel Amaç ve Kesinleşmiş Kapsam
 
-Proje hedefleri [docs/SCOPE.md](docs/SCOPE.md) belgesinde aşamalara ayrılmıştır:
+Proje hedefleri [docs/SCOPE.md](docs/SCOPE.md) ve [docs/ROADMAP.md](docs/ROADMAP.md) belgelerinde iki net faza ayrılmıştır:
 
-### İlk Sürüm (Şu Anki Kapsam - 32 Adım)
-- 32 pad üzerinde aynı pattern'in 32 adımı birlikte görüntülenir ve düzenlenir.
-- 8 track ve pattern yapısı aynen korunur (track sayısı veya pattern sayısı azaltılmaz).
-- Gate, Velocity, Microstep, Probability, Tie ve Mutate gibi stok sequencer yetenekleri ve parametreleri eksiksiz korunur.
-- Henüz çakışması olmayan güvenli bir tuş kombinasyonuyla stok mod ve Sequencer Only modu arasında geçiş sağlanır.
-- Sequencer Only modunda Packs sayfası devre dışı bırakılır; ileride projelerin stok projelerle karışmaması için ayrı proje alanı oluşturulur.
+### Faz 1: Çekirdek 32-Adım Sequencer Paketi (1. Cihaz Testi)
+- **Tek Ekranda 32 Adım (`grid_mode == 0`):** Eski Sample/Step ekranında 32 pad'in tamamı aynı pattern'in 1–32. adımlarını birlikte gösterir ve düzenler; Playhead 1'den 32'ye kesintisiz akar.
+- **Sayfa (`1–16`) Tuşu ve Görünüm Bağımsızlığı:** Ana 32-pad ekranında (`grid_mode == 0`) sayfa kaydırma ofseti `0`'a kilitlenirken; `Velocity`, `Gate`, `Note`, `Pattern Settings`, `Microstep` ve `Probability` ekranlarında alt 16 pad kendi düzenini korur ve **`1–16` sayfa değiştirme tuşu (1–16 / 17–32 geçişi) %100 orijinal haliyle çalışır**.
+- **Bağımsız 32 Sequencer Projesi (`[proj_view + 0x36]`):** Stok Projects ekranındaki 64 proje yuvasının ilk 32'si (`sayfa 0`) Normal Sample moduna, ikinci 32'si (`sayfa 1`, Proje 33–64) Sequencer Only moduna ayrılır. Sequencer modunda `Projects` tuşuna basıldığında bağımsız 32 Sequencer projesi görülür; boş pad ile yeni açma, `Save`, `Duplicate` ve `Clear` (Delete) %100 orijinal çalışır. `Packs` sayfası (`Shift + Projects`) Sequencer modunda kapatılır.
+- **Sadece MIDI Çıkışı:** Sequencer modunda dahili sample ses motoru susturulur, yalnızca harici synth/modüllere MIDI Note On/Off ve Clock/CC gönderilir.
 
-### Gelecek Hedef (64 Adım)
-- Tek bir mantıksal pattern'de 64 adım desteği ve sayfalar arasında gezinme.
+### Faz 2: Müzikal Genişleme Paketi (2. Cihaz Testi)
+- **Root Nota + Knob ile Akor / Triad Üretici:** Adımdaki kök nota üzerinden bir Macro Knob ile Tek Nota (Mono), 5th, Major Triad, Minor Triad, Sus2/4 ve 7th akor seçimi.
+- **32-Pad Ekranında Hızlı Uzunluk Kısayolu:** `grid_mode == 0` iken `1–16` + Pad `1..32` ile hızlı bitiş adımı seçimi.
 
 > [!NOTE]
-> Bellek analizi ([analysis/LONG-PATTERN-TESTS.md](analysis/LONG-PATTERN-TESTS.md)), stok veri yapısında doğrudan 33. adıma yazmanın veri çakışmasına yol açtığını göstermiştir. Bu nedenle 64 adıma geçiş için RAM/kayıt mimarisi kanıtlanmadan sınır artırılmayacaktır.
+> **Kapsam Dışı:** 64/128 adım, serbest çok notalı polifoni ve özel SD dosya sistemi müdahaleleri bellek/veri güvenliği nedeniyle kapsam dışı bırakılmıştır.
 
 ---
 
-## 3. Mevcut Teknik Durum
+## 2. Test ve Geliştirme Yöntemi
 
-Projenin şu anki durumu [docs/STATUS.md](docs/STATUS.md) ve [docs/UI-TRACE-5706.md](docs/UI-TRACE-5706.md) dokümanlarında özetlenmiştir:
+Geliştirmenin **%95'i bilgisayar üzerindeki Unicorn ARM Cortex-M emülatöründe** gerçek makine kodu çalıştırılarak doğrulanır. Fiziksel cihaza her adımda yükleme yapılmaz; yalnızca emülatörde tamamlanmış ve tüm testlerden geçmiş toplu paketler (Faz 1 ve Faz 2) cihaza yüklenir.
 
-- **Temel Doğrulama (M0):** Orijinal `stock/circuitrhythm-firmware-5706.syx` dosyası SHA-256 (`11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf`) ile sabitlendi. Baseline testleri, SysEx çözme/paketleme ve Unicorn ARM Cortex-M emülasyon testleri başarıyla çalıştı.
-- **UI ve Akış Analizi (M1):** Pad basış dağıtımı (`0x08040108`), step görünümü vtable yapısı (`0x080682CC`), step toggle (`0x0805D610`), commit/notify mekanizması ve LED observer zinciri statik disassembly ve sentetik testlerle doğrulandı.
-- **İlk Yama Taslağı (M2 Adayı):** Risk içermeyen, yalnızca step basıldığında LED rengini palet 31 yerine 30 yapan tek komutluk bir tanılama yaması ([docs/FIRST-PATCH-SCOPE.md](docs/FIRST-PATCH-SCOPE.md)) tasarlandı; ancak henüz derlenmedi veya cihaza yüklenmedi.
-
----
-
-## 4. Güvenlik ve Çalışma Kuralları
-
-- **Cihaz Güvenliği:** Fiziksel cihaza izinsiz hiçbir firmware veya komut gönderilmez. Orijinal SysEx dosyası asla ezilmez.
-- **Bootloader Koruması:** Bootloader, flash option byte'ları veya koruma bayraklarına kesinlikle müdahale edilmez. Yalnızca denetlenmiş uygulama (`0x08010000+`) alanı hedeflenir.
-- **Aşamalı İlerleme:** Tüm kod değişiklikleri önce yerel testlerde ve emülatörde kanıtlanır; testler [docs/ROADMAP.md](docs/ROADMAP.md) sırasına göre küçük adımlarla yürütülür.
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe scripts/run_baseline.py
+.\.venv\Scripts\python.exe scripts/run_ui_audit.py
+```
 
 ---
 
-## Dokümantasyon ve Rehberler
+## 3. Dokümantasyon ve Rehberler
 
-- [START-HERE.md](START-HERE.md) — İlk kurulum, ortam gereksinimleri ve test çalıştırma rehberi
-- [docs/SCOPE.md](docs/SCOPE.md) — Güncel ve gelecekteki fonksiyonel kapsam
-- [docs/STATUS.md](docs/STATUS.md) — Güncel geliştirme durumu ve açık görevler
-- [docs/ROADMAP.md](docs/ROADMAP.md) — Aşama aşama geliştirme kilometre taşları
+- [START-HERE.md](START-HERE.md) — İlk kurulum ve test çalıştırma rehberi
+- [docs/SCOPE.md](docs/SCOPE.md) — Kesinleşmiş Faz 1 ve Faz 2 fonksiyonel kapsamı
+- [docs/ROADMAP.md](docs/ROADMAP.md) — Emülatör odaklı geliştirme ve cihaz testi aşamaları
+- [docs/STATUS.md](docs/STATUS.md) — Güncel teknik durum ve doğrulanan adresler
+- [docs/UI-TRACE-5706.md](docs/UI-TRACE-5706.md) — 5706 makine kodu ve adres haritası
 - [docs/RECOVERY.md](docs/RECOVERY.md) — Cihaz yedekleme, bootloader ve kurtarma prosedürleri

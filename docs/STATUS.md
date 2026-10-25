@@ -1,73 +1,39 @@
 # Devralma durumu
 
-25 Ekim 2026. **M0 tamamlandı. M1 tamamlandı. M2 Adım 2 (Patcher Aracı) ve Adım 3 (Sentetik Doğrulama ve Cihaz Testi Teklifi) tamamlandı. Adım 4 (32 Pad Step Yönlendirmesi, Sayfa Mantığı ve Taşma Koruması) tamamlandı. Adım 5 (32 Adım LED Grid Birleştirici ve Playhead Gösterimi) tamamlandı.**
-Güncel sınır 32 adım; 64 adım, polifoni ve Elektron davranışları geliştirilmedi.
+25 Ekim 2026. **M0, M1, M2 ve M3 altyapısı tamamlandı. Kapsam ve mimari kesinleştirildi:**
+- **64 adım hedefinden tamamen vazgeçildi;** kalıcı sınır stok veri yapısıyla %100 uyumlu olan **32 adımdır**.
+- **Proje Yönetimi Mimari Keşfi (`0x0804F080` – `0x0804F2B8`):** Stok Projects görünümünün (`[ctrl + 0x50]`) her Pack içindeki 64 projeyi `[proj_view + 0x36]` baytıyla iki adet 32-projelik sayfaya (`0`: Proje 1–32, `1`: Proje 33–64) böldüğü makine kodunda doğrulandı. Normal modda `sayfa 0`, Sequencer modunda `sayfa 1` kilitlenerek ve `Packs` (`0x0803DB54`) ile Projects içi Up/Down (`0x0804F12C`) kapatılarak, SD dosya sistemine müdahale etmeden **32 bağımsız Sequencer projesi** (orijinal New, Save, Duplicate, Clear destekli) sağlanacaktır.
+- **Sayfa (`1–16`) Tuşu ve Ekran Modları (`0x0803E2D8`):** `grid_mode == 0` (eski Sample/Step ekranı) 32-pad adım ekranına dönüştürülürken sayfa ofseti `0`'a kilitlenecek; `Note` (`1/7`), `Velocity` (`2`), `Gate` (`3`), `Pattern Settings` (`4`), `Microstep` (`5`) ve `Probability` (`6`) ekranlarında ise alt 16 pad ve `1–16` sayfa değiştirme tuşu %100 orijinal haliyle korunacaktır.
+- **Faz 2 Müzikal Hedefi:** Serbest polifoni yerine Root Nota + Macro Knob ile Akor/Triad üretici (Mono, 5th, Maj, Min, Sus2/4, 7th) uygulanacaktır.
 
 ## Ortam ve bütünlük
 
 - Stock: 508.861 bayt; SHA-256 `11d604a6b6bef0d41378da03718658c7fe9c959ac24e7fef6563796b9932afaf`. Stock ve reference snapshot'ları değiştirilmedi.
-- Windows AMD64 build **26200.9711**, DisplayVersion **25H2**; CPU **AMD Ryzen 7 3700X 8-Core Processor**.
-  Registry ProductName `Windows 10 Pro`, Python platform çıktısı `Windows-10-10.0.26200-SP0`.
-- Python **3.11.9**, MSC v.1938, 64 bit; `.venv` aktif. Capstone paket **5.0.9**, Unicorn **2.1.4**. `-O` kullanılmadı.
-- Git **2.53.0.windows.2**. Remote yok. Firmware/build/log/venv/backups ignored kuralları devrede.
+- Windows AMD64 build **26200.9711**, Python **3.11.9** (64-bit, `.venv` aktif), Capstone **5.0.9**, Unicorn **2.1.4**. `-O` kullanılmadı.
 
-## Komutlar ve sonuçlar
+## Doğrulanan yeni makine kodu adresleri (M1 ekleri)
 
-Proje kökünde PowerShell, venv ile:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe scripts/patch_firmware.py --candidate-m2
-.\.venv\Scripts\python.exe scripts/verify_m2_candidate.py
-.\.venv\Scripts\python.exe scripts/run_ui_audit.py
-.\.venv\Scripts\python.exe scripts/run_baseline.py
-```
-
-| Test Paketi / Script | Sonuç | Gerçekte kanıtladığı |
-|---|---|---|
-| `tests/test_led_compositor.py` (5 test) | PASS (5/5) | Stok Step View LED getter (`0x0805D3BC`) ve Compositor (`0x0804DD1C`) davranışı; 32 adımlık Step View LED tamponunun üst 16 (1–16) ve alt 16 (17–32) pad'e 1-e-1 eşlenmesi; Playhead imlecinin (durum bit 0) 1'den 32'ye kesintisiz akışı ve satır izolasyonu; Note ve Velocity modlarında alt padlerin o modun orijinal düzenini koruduğu; bellek ve taşma sınır güvenliği doğrulandı. |
-| `tests/test_step_routing.py` (5 test) | PASS (5/5) | Stok container yönlendirmesi, `step >= 32` taşma ve bellek bozulma kanıtları (`view+0xB4`, ST1/ST2 parametre ezilmeleri), güvenli 32-pad tam döngü (tüm 32 adım ON/OFF ve commit), sınır ötesi çoklu basış ve clamping maskeleme doğrulandı. |
-| `tests/test_patcher.py` (15 test) | PASS (15/15) | Güvenlik sınırları, bozuk hash reddi, çakışma engeli, kayıpsız roundtrip ve tam durum RAM emülasyonu (`test_pad_press_synthetic_ram_full_state_comparison`) doğrulandı. |
-| `tests/test_ui_contracts.py` (7 test) | PASS (7/7) | UI kontratları, step press/release yaşam döngüsü ve sahiplik sınırları regresyon görmedi. |
-| `scripts/verify_m2_candidate.py` | PASS | 32 adımın tamamında (0..31) Unicorn sentetik RAM emülasyonu: basılı adım LED'i palet 31'den 30'a değişti; kalan 31 LED ve 20.800 baytlık pattern belleği %100 korundu. |
-| `scripts/patch_firmware.py --candidate-m2` | PASS | `build/circuitrhythm-5706-m2-candidate.syx` (SHA-256 `8c6996e2...`, CRC `0x2DBD7611`) ve manifest üretildi. İmajda yalnız 1 bayt değişti (`0x0805CF68`: `1f` -> `1e`). |
-| `scripts/run_ui_audit.py` | PASS | UI audit sentetik RAM ve statik kanıtları doğrulandı (`logs/ui-audit-.../`). |
-| `scripts/run_baseline.py` | PASS | Host baseline testleri eksiksiz geçti (`logs/baseline-.../`). |
-
-## Yeni kesin bulgular
-
-- **Step View LED Renk Motoru (`0x0805CF24`) ve Playhead İmleci:**
-  - Step View durum sözcüğü (`view + 0x74 + 2 * step`) içindeki Bit 0'ın (`0x0001`) Playhead (playback cursor) olduğu Unicorn ile kesin olarak kanıtlanmıştır.
-  - Palet eşlemesi:
-    - Boş adım (Bit 1 = 0): normalde `0x0019` (sönük), Playhead üzerinde iken `0x001B` (parlak beyaz/gri).
-    - Dolu adım (Bit 1 = 1, Hit): normalde `0x0018` (aktif renk), Playhead üzerinde iken `0x001A` (parlak vuruş rengi).
-    - Basılı adım (Bit 3 = 1, Held): palet 31 (`0x001F`) veya M2 yamasında palet 30 (`0x001E`).
-- **32 Adım LED Grid Birleştirici (Compositor):**
-  - Step View'ın mantıksal LED tamponu (`[view + 4]` -> cell -> buffer) yerel olarak 32 adımı (64 bayt) eksiksiz tutar.
-  - Stok `0x0805D3BC` fonksiyonu sayfa durumuna göre 32 bayt döndürürken (Sayfa 0: `buf + 0`, Sayfa 1: `buf + 0x20`), 32-adım birleştirici mimarisinde:
-    - İlk 16 kayıt (1–16. adımlar): üst 16 pad'e (`grid_output + 0x00`),
-    - İkinci 16 kayıt (17–32. adımlar): alt 16 pad'e (`grid_output + 0x20`) aktarılır.
-  - Playhead 0'dan 31'e kesintisiz aktığında, üst satırdan alt satıra geçişte (Adım 15 -> 16) gecikme veya kopma olmaksızın 32 pad boyunca akar; alt yarıda iken üst padlerde, üst yarıda iken alt padlerde playhead çiftlenmesi oluşmaz.
-- **Mod Bağımsızlığı ve Orijinal Alt Pad Korunumu:**
-  - Kullanıcı Note (`mode 0` alt view) veya Velocity (`mode 2`, `[grid + 0x9C]`) moduna geçtiğinde, Grid Compositor alt 16 pad'e Step View'ın ikinci yarısı yerine o modun orijinal LED tamponunu (`bottom_view + r7`) yansıtır.
-  - Grid Container `[grid + 0x258]` track store dizisi ve `0x080588AC` kontrol fonksiyonu doğrulanarak mod geçişlerinde bellek bütünlüğü tam olarak sağlandı.
-
-## Değişen dosyalar
-
-- `tests/test_led_compositor.py` (yeni; 32 adım LED birleştirici, playhead akışı ve mod koruma testleri, 5 test)
-- `docs/UI-TRACE-5706.md` (güncellendi; compositor, LED getter, renk motoru durum bitleri ve adres haritası)
-- `CHANGELOG.md` (güncellendi)
-- `docs/STATUS.md` (güncellendi)
-
-Geçici yapay çıktılar (`build/`, `logs/`) `.gitignore` altında korunmaktadır. Stock dosyalara dokunulmamıştır.
-
-## Başarısız denemeler ve açık sınırlar
-
-- `test_led_compositor.py` ilk çalıştırmasında `step_led_cell` adresi `view + 0x74` durum sözcükleri dizisi içerisine denk getirildiğinden Step 6 yazılırken pointer ezilmiş ve Step 7'de unmapped write hatası oluşmuştur; pointer nesne dışına taşınarak sorun çözülmüş ve mimari sınır netleştirilmiştir.
-- `mode = 2` (Velocity) çalıştırılırken `[grid + 0x258]` alanının `0x080588AC` tarafından track store dizisi olarak okunduğu tespit edilmiş ve sentetik fixture buna göre tamamlanmıştır.
-- Fiziksel cihaza hiçbir firmware gönderilmedi, komut iletilmedi veya MIDI/USB bağlantısı açılmadı.
-- Testler sentetik RAM emülasyonu ile sınırlandırılmıştır; donanım tarama zamanlaması ve RTOS thread etkileşimi henüz fiziksel cihazda ölçülmemiştir.
+| İşlev | Adres ve somut bulgu |
+|---|---|
+| Buton -> Grid Mode dönüşümü | `0x0803E2D8`: Button 8 (`Sample`) -> `mode 0` (veya `9`); Button 9 (`Note`) -> `mode 1` (`7`); Button 10 (`Velocity`) -> `mode 2`; Button 11 (`Gate`) -> `mode 3` (`5`); Button 12 (`Pattern Settings`) -> `mode 4` (`6`) |
+| Projects butonu ve Packs geçişi | `0x0803DB2E` (Button 26 = `Projects`): `Shift == 0` ve aktif görünüm `6` değilse `[ctrl + 0x50]` (`0x0804F080`) çağrılır ve Projects görünümü açılır; `Shift != 0` veya zaten Projects görünümündeyse `0x0803DB54` dalıyla Packs görünümüne (`mode 5`, `[ctrl + 0x40]`) geçilir |
+| Projects görünümü kurulumu | `0x0804F080`: Aktif proje numarasını (`0..63`) okur, `lsrs r2, r2, #5` ile sayfa (`0` veya `1`) hesaplayıp `[proj_view + 0x36]` (yani `[r5, #0x16]`) adresine yazar ve `0x0804F27E` LED çizimini çağırır |
+| Projects pad basışı (Load/New/Clear/Dup) | `0x0804F09E`: `[proj_view + 0x36]` sayfasını okur, `add.w r5, r5, r0, lsl #5` ile `pad + (sayfa * 32)` proje indeksini hesaplar; Clear (`+0x18`), Save (`+0x2C`), Duplicate (`+0x1C`) ve Load/New (`0x08047038`) işlemlerini yürütür |
+| Projects Up/Down sayfa değiştirme | `0x0804F12C`: Down (`0x13` = 19) basıldığında `[proj_view + 0x36] = 1`, Up (`0x14` = 20) basıldığında `[proj_view + 0x36] = 0` yazar |
+| Projects LED çizimi | `0x0804F27E`: `[proj_view + 0x36]` değerini okuyup `0x0804F2B8` (`add.w r5, sl, r0, lsl #5`) ile `0..31` veya `32..63` projelerini 32 pad'e çizer |
+| Güvenli Heap Durum Bloğu | Stok bump allocator (`0x08025A98`): limit `[0x20002B54]` (`0x2004F760`), current `[0x20002B58]` (`0x2004EA98`). `0x2004F660` adresinde 256 baytlık blok (`HEAP_LIMIT - 256`) ayırmak için limit düşürülebilir |
+| Uygulama Sonu / Code Cave Alanı | Stok imaj sonu `0x0806A570`; uygulama flash üst sınırı `0x08080000` (~88 KB boş flash alanı) |
 
 ## Sonraki tek somut görev
 
-32 Pad Yönlendirmesi (Adım 4) ve 32 Adım LED Birleştirici (Adım 5) mantığının entegre mikro-yama tasarımına dönüştürülmesi ve Sequencer Only modu geçiş tuş kombinasyonu hazırlığı.
+**M4 Adımı:** Mod geçişi (`seq_enabled`), `grid_mode == 0`'da 32 pad -> Step View yönlendirmesi (`0x0804DC86`, `0x0804DF3E`), sayfa ofsetinin `grid_mode == 0`'da `0`'a kilitlenmesi (`0x0805CB04`, `0x0805CCF0`) ve sahiplik temizliği (`view + 0xB8`, `view + 0xC0`, `view + 0x74` bit 3) makine kodu yamalarını `src/seq_Patch.py` içine ekleyip Unicorn emülatöründe doğrulamak.
+
+## Tamamlanan Son Aşama (M3 Adım 1 & Adım 2 — TAMAMLANDI)
+
+- **M3 Adım 1:** `scripts/patch_firmware.py` code-cave desteği (`FLASH_END = 0x08080000`, 4-bayt hizalama, dinamik boyut ve MPEG-2 CRC-32 header güncellemesi) ve `tests/test_patcher.py` içindeki 6 yeni test (`TestCodeCaveSupport`) tamamlandı.
+- **M3 Adım 2:**
+  - `src/thumb_asm.py`: MIT lisanslı Thumb/Thumb-2 makine kodu üreticisi (`Asm`, `bl`, `b_w`, `push`, `pop`, `ldr`, `str`, `ldrb`, `strb`, `movw`, `movt` vb.) oluşturuldu.
+  - `src/seq_Patch.py`: `CODE_CAVE_BASE = 0x0806A570`, `SEQ_STATE_ADDR = 0x2004F660` (256 bayt, `MAGIC = 0x31514553` `"SEQ1"`), durum bloğu ofsetleri (`+0x00` `magic`, `+0x04` `seq_enabled`, `+0x05` `last_normal_proj`, `+0x06` `last_seq_proj = 32`, `+0x08` `grid_ptr`) ve `c_seq_state()` Thumb-2 makine kodu üreticisi tamamlandı.
+  - `tests/test_seq_state.py`: Capstone disassembly ve Unicorn emülasyon testleri (8 yeni test: normal rezervasyon, ikinci çağrıda durum koruma, tam sınır `current == 0x2004F660`, dolu heap `current > 0x2004F660`, beklenmeyen limit reddi, bozuk magic kurtarma ve stok bump allocator `0x08025A98` entegrasyonu) eklendi.
+- **Komut ve Sonuç:** `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` -> **46 testin tamamı PASS** (0 hata). `analysis/` ve `stock/` altındaki hiçbir dosya değiştirilmedi.
+- **Başarısız Hipotezler / Açık Riskler:** Başarısız hipotez yok. Açık risk olarak M4–M6 kancalarının gerçek RTOS görev sıralaması ve yığın kullanımı Unicorn testleriyle adım adım doğrulanmaya devam edecektir.

@@ -3,8 +3,10 @@
 Ensures strict validation against stock 5706 firmware:
 - Enforces SHA-256 hash validation on input SysEx and extracted image.
 - Prevents overwriting stock firmware or input file.
-- Enforces application bounds [0x08010000, 0x0806A570) and strictly protects
+- Enforces application bounds [0x08010000, 0x08080000) and strictly protects
   the Cortex-M vector table and identity area [0x08010000, 0x08010200).
+- Supports in-place patches within [0x08010200, 0x0806A570) and code-cave
+  extension patches within [0x0806A570, 0x08080000).
 - Verifies original bytes at target addresses before applying changes.
 - Detects and rejects overlapping patch ranges.
 - Recomputes MPEG-2 CRC-32 and packages valid SysEx frames.
@@ -32,13 +34,15 @@ STOCK_IMAGE_SIZE = 0x5A570  # 370032 bytes
 STOCK_CRC32_MPEG2 = 0x9EEE802C
 APP_BASE = 0x08010000
 APP_END = APP_BASE + STOCK_IMAGE_SIZE  # 0x0806A570
+FLASH_END = 0x08080000  # 0x08080000 (maximum application flash boundary; 0x70000 = 458,752 bytes)
+MAX_IMAGE_SIZE = FLASH_END - APP_BASE  # 0x70000 (458,752 bytes)
 
 # Vector table & identity protection: the first 0x200 bytes (512 bytes)
 # contains the ARM Cortex-M vector table (SP, Reset, NMI, HardFault, handlers)
 # and Novation identity string ("DR1.1.5143.5706"). Never patch this region.
 VECTOR_TABLE_SIZE = 0x200
 APP_WRITABLE_START = APP_BASE + VECTOR_TABLE_SIZE  # 0x08010200
-APP_WRITABLE_END = APP_END  # 0x0806A570
+APP_WRITABLE_END = APP_END  # 0x0806A570 (stock writable boundary)
 
 # SysEx Protocol Constants
 SYX_PREFIX = bytes([0xF0, 0x00, 0x20, 0x29, 0x00])
@@ -208,8 +212,15 @@ def int_to_nibbles(v: int, count: int = 8) -> bytes:
     return bytes((v >> (4 * (count - 1 - i))) & 0xF for i in range(count))
 
 
-def unpack_syx(syx: bytes) -> dict:
-    """Parses and validates a Novation Circuit Rhythm firmware .syx file."""
+def unpack_syx(syx: bytes, allow_extended: bool = False) -> dict:
+    """Parses and validates a Novation Circuit Rhythm firmware .syx file.
+
+    Args:
+        syx: Raw SysEx byte stream.
+        allow_extended: If False (default), image size must equal STOCK_IMAGE_SIZE.
+            If True, accepts extended images in [STOCK_IMAGE_SIZE, FLASH_END - APP_BASE]
+            that are 4-byte aligned.
+    """
     msgs = split_syx(syx)
     if len(msgs) < 4:
         raise SysExFormatError("Firmware SysEx must have at least INIT, HEADER, WRITE, and FINISH messages")
@@ -229,8 +240,16 @@ def unpack_syx(syx: bytes) -> dict:
     size = nibbles_to_int(header_payload[7:15])
     crc = nibbles_to_int(header_payload[15:23])
 
-    if size != STOCK_IMAGE_SIZE:
-        raise SysExFormatError(f"Unexpected image size in header: {size:#x} (expected {STOCK_IMAGE_SIZE:#x})")
+    max_image_size = FLASH_END - APP_BASE
+    if not allow_extended:
+        if size != STOCK_IMAGE_SIZE:
+            raise SysExFormatError(f"Unexpected image size in header: {size:#x} (expected stock {STOCK_IMAGE_SIZE:#x})")
+    else:
+        if size < STOCK_IMAGE_SIZE or size > max_image_size or (size % 4 != 0):
+            raise SysExFormatError(
+                f"Invalid extended image size in header: {size:#x} "
+                f"(expected between {STOCK_IMAGE_SIZE:#x} and {max_image_size:#x}, 4-byte aligned)"
+            )
 
     blocks = []
     # Block 0 is packed in the final FINISH message
@@ -240,6 +259,9 @@ def unpack_syx(syx: bytes) -> dict:
         blocks.append(unpack7(m[6:-1]))
 
     data = b"".join(blocks)
+    if len(data) < size:
+        raise SysExFormatError(f"Truncated SysEx payload: decoded {len(data)} bytes, header specifies {size}")
+
     image = data[:size]
     computed_crc = crc32_mpeg2(image)
     if computed_crc != crc:
@@ -257,9 +279,22 @@ def unpack_syx(syx: bytes) -> dict:
 
 
 def pack_syx(image: bytes, init: bytes, header_prefix: bytes) -> bytes:
-    """Builds a valid Novation Circuit Rhythm firmware .syx from image bytes."""
-    if not image or len(image) != STOCK_IMAGE_SIZE:
-        raise ValueError(f"Image size must be exactly {STOCK_IMAGE_SIZE} bytes")
+    """Builds a valid Novation Circuit Rhythm firmware .syx from image bytes.
+
+    Accepts image sizes between STOCK_IMAGE_SIZE and FLASH_END - APP_BASE (multiple of 4).
+    Writes updated image size and MPEG-2 CRC-32 into the HEADER message.
+    """
+    max_image_size = FLASH_END - APP_BASE
+    if (
+        not image
+        or len(image) < STOCK_IMAGE_SIZE
+        or len(image) > max_image_size
+        or (len(image) % 4 != 0)
+    ):
+        raise ValueError(
+            f"Image size must be between {STOCK_IMAGE_SIZE:#x} and {max_image_size:#x} bytes "
+            f"and a multiple of 4 bytes (got {len(image) if image else 0} bytes)"
+        )
     crc = crc32_mpeg2(image)
     out: list[bytes] = []
 
@@ -284,7 +319,7 @@ def pack_syx(image: bytes, init: bytes, header_prefix: bytes) -> bytes:
     syx_result = b"".join(out)
 
     # Round-trip sanity check to ensure output is 100% decodable and CRC matches
-    verification = unpack_syx(syx_result)
+    verification = unpack_syx(syx_result, allow_extended=True)
     if verification["image"] != image or verification["crc"] != crc:
         raise SysExFormatError("Sanity verification of newly packed SysEx failed")
 
@@ -341,11 +376,23 @@ def validate_patch_ranges(patches: Sequence[PatchHunk]) -> None:
                 f"Patch '{p.name}' at {p.address:#010x} is below writable application boundary "
                 f"({APP_WRITABLE_START:#010x}). Modifying vector table or bootloader is forbidden!"
             )
-        if p.end_address > APP_WRITABLE_END:
+        if p.end_address > FLASH_END:
             raise AddressBoundsError(
                 f"Patch '{p.name}' range [{p.address:#010x}, {p.end_address:#010x}) exceeds "
-                f"application end boundary ({APP_WRITABLE_END:#010x})!"
+                f"flash end boundary ({FLASH_END:#010x})!"
             )
+        if p.address < APP_END:
+            if p.end_address > APP_END:
+                raise AddressBoundsError(
+                    f"Patch '{p.name}' range [{p.address:#010x}, {p.end_address:#010x}) crosses "
+                    f"stock application boundary ({APP_END:#010x})!"
+                )
+        else:
+            # p.address >= APP_END: extension patch (code cave)
+            if any(b != 0xFF for b in p.expected):
+                raise AddressBoundsError(
+                    f"Extension patch '{p.name}' at {p.address:#010x} must expect unprogrammed 0xFF bytes!"
+                )
 
     # Check for overlaps between ranges
     sorted_patches = sorted(patches, key=lambda x: x.address)
@@ -367,6 +414,9 @@ def apply_patches(
 ) -> tuple[bytes, list[dict], list[dict]]:
     """Applies patches to image bytearray after validating original bytes.
 
+    Supports in-place patches within [0x08010200, 0x0806A570) and code-cave
+    extension patches within [0x0806A570, 0x08080000).
+
     Returns:
         (patched_image, patches_applied, changed_ranges)
     """
@@ -376,8 +426,15 @@ def apply_patches(
     validate_patch_ranges(patches)
 
     patched = bytearray(image)
+
+    # If extension patches exist beyond APP_END, extend patched with 0xFF
+    max_end = max((p.end_address for p in patches), default=APP_END)
+    if max_end > APP_END:
+        extend_len = (max_end - APP_BASE) - len(patched)
+        if extend_len > 0:
+            patched.extend(b"\xFF" * extend_len)
+
     patches_applied: list[dict] = []
-    changed_ranges: list[dict] = []
 
     for p in patches:
         off = p.offset
@@ -400,8 +457,15 @@ def apply_patches(
             "replacement_hex": p.replacement.hex(),
         })
 
+    # Word-align image length to 4 bytes with 0xFF padding
+    align_pad = (-len(patched)) % 4
+    if align_pad > 0:
+        patched.extend(b"\xFF" * align_pad)
+
     # Compute actual changed byte ranges (at byte granularity)
-    diff_indices = [i for i, (o, n) in enumerate(zip(image, patched)) if o != n]
+    compare_orig = image + b"\xFF" * (len(patched) - len(image))
+    diff_indices = [i for i, (o, n) in enumerate(zip(compare_orig, patched)) if o != n]
+    changed_ranges: list[dict] = []
     if diff_indices:
         range_start = diff_indices[0]
         prev = diff_indices[0]
@@ -414,7 +478,7 @@ def apply_patches(
                     "end_address": f"{APP_BASE + prev + 1:#010x}",
                     "offset": f"{range_start:#x}",
                     "byte_count": prev - range_start + 1,
-                    "old_bytes": image[range_start : prev + 1].hex(),
+                    "old_bytes": compare_orig[range_start : prev + 1].hex(),
                     "new_bytes": patched[range_start : prev + 1].hex(),
                 })
                 range_start = idx
@@ -424,7 +488,7 @@ def apply_patches(
             "end_address": f"{APP_BASE + prev + 1:#010x}",
             "offset": f"{range_start:#x}",
             "byte_count": prev - range_start + 1,
-            "old_bytes": image[range_start : prev + 1].hex(),
+            "old_bytes": compare_orig[range_start : prev + 1].hex(),
             "new_bytes": patched[range_start : prev + 1].hex(),
         })
 

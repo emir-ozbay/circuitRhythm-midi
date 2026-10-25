@@ -37,6 +37,7 @@ from patch_firmware import (
     STOCK_CRC32_MPEG2,
     APP_BASE,
     APP_END,
+    FLASH_END,
     APP_WRITABLE_START,
     APP_WRITABLE_END,
     M2_CANDIDATE_PATCH,
@@ -549,6 +550,190 @@ class TestSyntheticRamExecutionOfPatchedCode(unittest.TestCase):
                     bytes(u_stock.mem_read(env_s["st2"], 0x100)),
                     bytes(u_patched.mem_read(env_p["st2"], 0x100)),
                 )
+
+
+
+class TestCodeCaveSupport(unittest.TestCase):
+    """Tests for code cave extension support in [0x0806A570, 0x08080000)."""
+
+    def setUp(self):
+        self.stock_path = ROOT / "stock" / "circuitrhythm-firmware-5706.syx"
+        self.stock_bytes = self.stock_path.read_bytes()
+        self.stock_image = unpack_syx(self.stock_bytes)["image"]
+
+    def test_boundary_crossing_patch_strictly_rejected(self):
+        """Verifies that a patch crossing the stock image boundary (e.g., at 0x0806A56E) is rejected."""
+        # 0x0806A56E with len 4 spans 0x0806A56E..0x0806A572 (crosses stock APP_END 0x0806A570)
+        cross_patch = PatchHunk(
+            address=0x0806A56E,
+            expected=b"\xFF" * 4,
+            replacement=b"\x01\x02\x03\x04",
+            name="cross_stock_boundary_even",
+        )
+        with self.assertRaises(AddressBoundsError):
+            validate_patch_ranges([cross_patch])
+
+        # 0x0806A56F with len 2 spans 0x0806A56F..0x0806A571
+        cross_patch_odd = PatchHunk(
+            address=APP_END - 1,
+            expected=b"\xFF" * 2,
+            replacement=b"\xAA\xBB",
+            name="cross_stock_boundary_odd",
+        )
+        with self.assertRaises(AddressBoundsError):
+            validate_patch_ranges([cross_patch_odd])
+
+    def test_code_cave_bounds_and_expected_bytes_validation(self):
+        """Verifies that valid code cave ranges pass, but non-0xFF expected or flash overflow are rejected."""
+        # Valid code cave patch right at APP_END (0x0806A570)
+        valid_cave = PatchHunk(
+            address=APP_END,
+            expected=b"\xFF" * 16,
+            replacement=b"\x42" * 16,
+            name="valid_cave_16",
+        )
+        validate_patch_ranges([valid_cave])
+
+        # Extension patch must expect unprogrammed 0xFF bytes
+        invalid_expected = PatchHunk(
+            address=APP_END,
+            expected=b"\x00" * 16,
+            replacement=b"\x42" * 16,
+            name="invalid_expected_zeroes",
+        )
+        with self.assertRaises(AddressBoundsError):
+            validate_patch_ranges([invalid_expected])
+
+        # Patch exceeding FLASH_END (0x08080000)
+        at_flash_end = PatchHunk(
+            address=FLASH_END,
+            expected=b"\xFF" * 4,
+            replacement=b"\x01" * 4,
+            name="at_flash_end",
+        )
+        with self.assertRaises(AddressBoundsError):
+            validate_patch_ranges([at_flash_end])
+
+        cross_flash_end = PatchHunk(
+            address=FLASH_END - 2,
+            expected=b"\xFF" * 4,
+            replacement=b"\x01" * 4,
+            name="cross_flash_end",
+        )
+        with self.assertRaises(AddressBoundsError):
+            validate_patch_ranges([cross_flash_end])
+
+    def test_code_cave_apply_and_alignment(self):
+        """Verifies that code cave patches extend the image and are 4-byte word aligned."""
+        # 16-byte extension patch (already 4-byte aligned)
+        cave_data = bytes(range(16))
+        cave_patch = PatchHunk(
+            address=APP_END,
+            expected=b"\xFF" * 16,
+            replacement=cave_data,
+            name="cave_16_bytes",
+        )
+        patched, patches_applied, changed_ranges = apply_patches(self.stock_image, [cave_patch])
+
+        self.assertEqual(len(patched), STOCK_IMAGE_SIZE + 16)
+        self.assertEqual(len(patched) % 4, 0)
+        self.assertEqual(patched[:STOCK_IMAGE_SIZE], self.stock_image)
+        self.assertEqual(patched[STOCK_IMAGE_SIZE : STOCK_IMAGE_SIZE + 16], cave_data)
+        self.assertEqual(len(patches_applied), 1)
+        self.assertEqual(len(changed_ranges), 1)
+        self.assertEqual(changed_ranges[0]["start_address"], f"{APP_END:#010x}")
+        self.assertEqual(changed_ranges[0]["end_address"], f"{APP_END + 16:#010x}")
+        self.assertEqual(changed_ranges[0]["byte_count"], 16)
+
+        # 5-byte extension patch: must be padded to 8 bytes (multiple of 4) with 0xFF
+        cave_data_5 = bytes([0x11, 0x22, 0x33, 0x44, 0x55])
+        cave_patch_5 = PatchHunk(
+            address=APP_END,
+            expected=b"\xFF" * 5,
+            replacement=cave_data_5,
+            name="cave_5_bytes",
+        )
+        patched_5, _, _ = apply_patches(self.stock_image, [cave_patch_5])
+        self.assertEqual(len(patched_5), STOCK_IMAGE_SIZE + 8)
+        self.assertEqual(len(patched_5) % 4, 0)
+        self.assertEqual(patched_5[STOCK_IMAGE_SIZE : STOCK_IMAGE_SIZE + 5], cave_data_5)
+        self.assertEqual(patched_5[STOCK_IMAGE_SIZE + 5 : STOCK_IMAGE_SIZE + 8], b"\xFF\xFF\xFF")
+
+    def test_code_cave_pack_unpack_and_crc(self):
+        """Verifies that extended images pack into SysEx, calculate correct CRC, and unpack with allow_extended=True."""
+        cave_data = bytes([0xAA, 0xBB, 0xCC, 0xDD] * 4)  # 16 bytes
+        cave_patch = PatchHunk(
+            address=APP_END,
+            expected=b"\xFF" * 16,
+            replacement=cave_data,
+            name="cave_16",
+        )
+        patched, _, _ = apply_patches(self.stock_image, [cave_patch])
+
+        parsed_stock = unpack_syx(self.stock_bytes)
+        packed_syx = pack_syx(patched, parsed_stock["init"], parsed_stock["header_prefix"])
+
+        # Default unpack_syx (allow_extended=False) must reject extended image
+        with self.assertRaises(SysExFormatError):
+            unpack_syx(packed_syx, allow_extended=False)
+
+        # allow_extended=True accepts and validates size and CRC
+        unpacked = unpack_syx(packed_syx, allow_extended=True)
+        self.assertEqual(unpacked["size"], STOCK_IMAGE_SIZE + 16)
+        self.assertEqual(unpacked["image"], patched)
+        self.assertEqual(unpacked["crc"], crc32_mpeg2(patched))
+        self.assertTrue(unpacked["crc_ok"])
+
+    def test_pack_syx_rejects_invalid_sizes(self):
+        """Verifies pack_syx size and alignment constraints."""
+        parsed_stock = unpack_syx(self.stock_bytes)
+        init = parsed_stock["init"]
+        hdr = parsed_stock["header_prefix"]
+
+        # Size not a multiple of 4
+        with self.assertRaises(ValueError):
+            pack_syx(b"\xFF" * (STOCK_IMAGE_SIZE + 1), init, hdr)
+
+        # Size smaller than stock image size
+        with self.assertRaises(ValueError):
+            pack_syx(b"\xFF" * (STOCK_IMAGE_SIZE - 4), init, hdr)
+
+        # Size exceeding flash capacity (0x70000)
+        with self.assertRaises(ValueError):
+            pack_syx(b"\xFF" * (FLASH_END - APP_BASE + 4), init, hdr)
+
+    def test_code_cave_patch_firmware_end_to_end(self):
+        """Verifies end-to-end patch_firmware pipeline with a code cave extension patch."""
+        with tempfile.TemporaryDirectory() as tmp:
+            out_syx = Path(tmp) / "extended.syx"
+            out_manifest = Path(tmp) / "extended.manifest.json"
+
+            cave_data = bytes([0x10, 0x20, 0x30, 0x40] * 4)  # 16 bytes
+            cave_patch = PatchHunk(
+                address=APP_END,
+                expected=b"\xFF" * 16,
+                replacement=cave_data,
+                name="test_code_cave_16",
+            )
+
+            manifest = patch_firmware(
+                input_path=self.stock_path,
+                output_path=out_syx,
+                patches=[cave_patch],
+                manifest_path=out_manifest,
+                stock_path=self.stock_path,
+            )
+
+            self.assertTrue(out_syx.exists())
+            self.assertTrue(out_manifest.exists())
+            self.assertEqual(manifest["output"]["image_size"], STOCK_IMAGE_SIZE + 16)
+            self.assertEqual(manifest["total_bytes_changed"], 16)
+
+            unpacked = unpack_syx(out_syx.read_bytes(), allow_extended=True)
+            self.assertEqual(unpacked["size"], STOCK_IMAGE_SIZE + 16)
+            self.assertEqual(unpacked["image"][:STOCK_IMAGE_SIZE], self.stock_image)
+            self.assertEqual(unpacked["image"][STOCK_IMAGE_SIZE : STOCK_IMAGE_SIZE + 16], cave_data)
+            self.assertEqual(unpacked["crc"], crc32_mpeg2(unpacked["image"]))
 
 
 if __name__ == "__main__":
