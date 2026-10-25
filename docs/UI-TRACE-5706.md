@@ -46,8 +46,10 @@ Kod adresleri çift; vtable içindeki Thumb pointer'ları tek sayılıdır.
 | Pattern commit | vtable `0x080696A0` → `0x08048208` | D+E; listener+0x1C ST1, +0x20 ST2, +0x28 pattern seçim store'u; pattern tabanı `[listener+4] + 0xA28*selected`. ST1 alanları 3/2/4/5; ST2 alanları 0/1/6; 32 kayıt işlenir |
 | Step LED observer | shim `0x0805D092` (`this -= 8`), gövde `0x0805D094` | D+E; ST1 velocity değişiklikleri LED durum bit 1'i günceller; sample-flip için ayrı dal vardır. Test gerçek notify ile gerçek observer'ı çağırır |
 | Step LED renk hesabı | `0x0805CF24`; durum kaydı `view+0x74+2*step`; çıktı `[[view+4]]+2*step` | D+E; 16-bit mantıksal renk kaydıdır, doğrudan fiziksel RGB buffer'ı değildir |
-| Step LED penceresi | `0x0805D3BC` | D+E; `[view+0x60]` p0 sıfırsa buffer, değilse buffer+32 bayt döndürür: 16 × 2 bayt kayma |
-| Ekran birleştirme | vtable `0x080678F8` → `0x0804DD1C` | D; `0x08052108` ile subview slot 7 çağrılır; `0x0804DDAC..BE` iki ayrı 32 baytı grid çıktı buffer'ının +0/+32 bölümlerine kopyalar. Alt görünüm için başka mode/sayfa koşulları da vardır |
+| Step LED penceresi | `0x0805D3BC` | D+E; `[view+0x60]` p0 sıfırsa buffer, değilse buffer+32 bayt döndürür: 16 × 2 bayt kayma (`cbz r1, adds r0, #0x20`) |
+| Ekran birleştirme (Compositor) | vtable `0x080678F8` → `0x0804DD1C` | D+E; `0x08052108` ile subview slot 7 çağrılır; üst subview'dan 32 baytı `grid+0`, alt subview'dan (`+r7` ofseti ile) 32 baytı `grid+0x20`'ye `0x08022CF0` (memcpy) ile aktarır. Extra subview 1 (`0x0804DB78`) ve 2 (`0x0804DCB2`, sayfa tuşları) yan tuşları yönetir |
+| Step LED renk motoru ve durum bitleri | `0x0805CF24`; durum kaydı `view+0x74+2*step`; çıktı `[[view+4]]+2*step` | D+E; durum bitlerine göre mantıksal renk atar: Bit 0 (Playhead/Cursor: boş adım 0x001B, dolu adım 0x001A), Bit 1 (Hit/Dolu: boş 0x0019, dolu 0x0018), Bit 2 (Loop range), Bit 3 (Held: palet 31/30) |
+| Grid mod kontrolü ve alt ofset | `0x080588EE`, `0x080588AC` | D+E; `r7` alt tampon ofseti; mod 0'da sayfa durumuna göre `page * 0x20` (0 veya 32 bayt); mod 1/4/7/8/9/10'da 0x20; mod 2/3'te 0. `0x080588AC` `[grid+0x258]` track store dizisini kontrol eder |
 | Alt LED aktarımı | `0x0802596E` → `0x0802960C`; `0x0802964E` → `0x08029684` | D / baseline; downstream frame/bit-plane işleme. Grid renklerinin fiziksel pad/RGB'ye tam dönüşümü bu turda tamamlanmadı |
 | MIDI | router `0x0803B7EC` / `0x0803B8F0`; mask dispatcher `0x0802986A`; port send `0x080401FE` | Baseline D/E sınırları geçerli; fiziksel MIDI, kuyruk basıncı ve Note Off yaşam döngüsü yok |
 
@@ -95,6 +97,27 @@ Kod adresleri çift; vtable içindeki Thumb pointer'ları tek sayılıdır.
 4. `test_cross_boundary_concurrent_press_and_release`: Üst/alt yarı sınırında (pad 15 ve 16) eşzamanlı basış doğrulaması. `view + 0xC0` held maskesinin birden fazla biti aynı anda başarıyla koruduğu ve ardışık bırakışlarda adımların bağımsız commit edildiği kanıtlanır.
 5. `test_routing_guard_clamping_prevents_overflow`: Sınır maskelemesi (`pad & 0x1F`) ile 32, 47, 63, 127 gibi sınır dışı değerlerin Step View'a geçmeden güvenle sınırlandığı ve `view + 0xB4` bölgesini asla bozmadığı doğrulanır.
 
+`tests/test_led_compositor.py` beş LED birleştirme ve playhead doğrulaması testi içerir:
+
+1. `test_stock_step_view_led_getter_and_compositor_split`: Stok Step View LED getter (`0x0805D3BC`) ve Compositor (`0x0804DD1C`) ayrım mekanizması:
+   - Sayfa 0'da Step View LED getter 64 baytlık tamponun başını (`buffer + 0`), Sayfa 1'de ise ikinci yarısını (`buffer + 0x20`) döndürür.
+   - Stok Grid Compositor üst 16 pad'e Step View penceresini, alt 16 pad'e Note görünümünü (`r7` ofseti ile Sayfa 0'da 0, Sayfa 1'de +0x20) kopyalar.
+2. `test_step_view_32step_logical_led_buffer_mapping`: Step View 32 adımlık mantıksal LED tamponu ve 32-pad grid eşlemesi:
+   - 32 adımın her biri stok renk motoru (`0x0805CF24`) ile renklendirilir (hit durumunda `0x0018`, boş durumda `0x0019`).
+   - 32-adım LED Compositor, Step View'ın ilk 16 kaydını (`0..15`) üst 16 pad'e (`grid_output + 0`), ikinci 16 kaydını (`16..31`) alt 16 pad'e (`grid_output + 0x20`) kopyalar.
+   - 32 pad'in 32'si de Step View'ın tam 32 adımı ile birebir (1-to-1) eşleşir; hiçbir adım ötelenmez veya üst üste binmez.
+3. `test_playhead_continuous_flow_across_32_steps`: Playhead imlecinin (durum bit 0) 1'den 32'ye kesintisiz akışı:
+   - Playhead 0'dan 31'e kadar tüm 32 adım üzerinde sırayla ilerletilir.
+   - Her adımda önceki adımın bit 0'ı temizlenir, aktif adımın bit 0'ı set edilir ve `0x0805CF24` çağrılır.
+   - Aktif adım boşsa playhead rengi `0x001B`, doluysa `0x001A` (parlak vuruş) olur.
+   - Compositor sonrası grid tamponunda tam olarak `cursor`. pad'in playhead rengini aldığı, kalan 31 pad'in playhead rengi taşımadığı doğrulanır.
+   - Cursor 0..15 iken alt 16 pad'de, cursor 16..31 iken üst 16 pad'de hiçbir playhead sızıntısı olmadığı, özellikle 15'ten 16'ya sınır geçişinde imlecin kesintisiz aktığı kanıtlanır.
+4. `test_other_modes_preserve_original_bottom_pad_layout`: Diğer modlarda (Note, Velocity vb.) alt pad orijinal düzeninin korunması:
+   - Mode 2 (Velocity) veya Mode 0 (Note) seçildiğinde alt 16 pad'in Step View 16–31 adımları yerine, o modun kendi subview LED tamponunu (Velocity için `[grid+0x9C]`, Note için `[grid+0x14]`) yansıttığı bayt bayt doğrulanır.
+   - Üst 16 pad Step View görünümünü korurken, alt padlerin mod bağımsızlığı %100 kanıtlanır.
+5. `test_compositor_memory_safety_and_no_overflow`: Compositor bellek güvenliği ve taşma koruması:
+   - Grid buffer sonrasındaki (offset 0x54 ve ötesi) canary baytlarının ve Step View `view + 0xB4` alanının asla bozulmadığı, arabelleğin güvenle sınırlandığı kanıtlanır.
+
 Son zincirlerde RTOS timer kuyrukları (`0x08046dde` / `0x08046e2a`) `bx lr` ile yalıtılmış, tetiklenen timer id ve callback'leri
 hook ile izlenmiştir. Diğer UI, toggle, notify, commit ve observer mekanizmaları stock kod ile çalıştırılmıştır.
 Nesneler ve listener bağlantıları sentetik olarak kuruldu; bu, stock constructor'ların gerçek cihazda aynı anda kurduğu
@@ -135,8 +158,10 @@ Yapılan testler ve disassembly analizi şu kesin mimari sınırları ortaya ç�
 - Uzun basışın (hold) kısa basıştan (tap) nasıl ayrıldığı kanıtlandı: timer 6 callback'i (`0x0805CE48`, 300 ms),
   `view+0xB8` pending toggle maskesinden basılı pad'i temizleyerek bırakma anındaki toggle'ı iptal eder ve edit modunu açar.
 - `step >= 32` taşmasının Step View bellek bloklarını (`view + 0xB4`) ve ST1/ST2 parametre dizilerini nasıl tahrip ettiği sentetik testlerle kesin olarak kanıtlandı.
+- Grid Compositor (`0x0804DD1C`) ve Step View LED getter (`0x0805D3BC`) yapısı çözümlendi; durum bit 0'ın (`0x0001`) Playhead (playback cursor) olduğu ve 32 adımın tamamında (0..31) kesintisiz akabildiği kanıtlandı.
+- Note (`mode 0`) ve Velocity (`mode 2`) gibi modlarda alt 16 pad'in o modun kendi alt subview LED tamponunu (`bottom_view + r7`) yansıttığı ve mod bağımsızlığının tam olarak korunduğu kanıtlandı.
 - Gerçek controller/track/pattern nesnelerinin RTOS eşzamanlılığı, SD save/load ve fiziksel tarama zamanlaması açık.
 - Gate/tie, Mutate, Clear/Duplicate ve 1–16 düğmesi uzunluk gesture'ı ayrı kabul testleri gerektirir.
 - Mod kısayolu seçilmedi; ayrı Projects/Packs/MIDI-only davranışı uygulanmadı.
 
-Sonraki tek görev: Grid Container (`0x0804DC86` / `0x0804DF3E`) ve Step View sayfa ofseti için 32-pad yönlendirme mikro-yama tasarımının (M3/M4 hazırlığı) formüle edilmesi.
+Sonraki tek görev: 32 Pad Yönlendirmesi ve LED Birleştirici mikro-yamalarının (M3/M4) entegrasyonu ve mod kısayol/geçiş mekanizmasının tasarlanması.

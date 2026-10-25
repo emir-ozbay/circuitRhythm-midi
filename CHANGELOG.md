@@ -1,5 +1,29 @@
 # Changelog
 
+## 32 Adım LED Grid Birleştirici (Compositor) ve Playhead Gösterimi (Adım 5) — 2026-10-25
+- Grid LED compositor fonksiyonu (`0x0804DD1C`), Step View LED getter yapısı (`0x0805D3BC`), Step renk motoru (`0x0805CF24`) ve yardımcı alt görünüm fonksiyonları (`0x080588AC`, `0x080588EE`, `0x0804DCB2`, `0x0804DB78`) tersine mühendislikle çözümlendi.
+- Step View LED renk motoru (`0x0805CF24`) ve durum bayrakları dizisi (`view + 0x74 + 2 * step`) incelendi:
+  - Durum biti 0'ın (`0x0001`) Playhead (playback cursor) olduğu Unicorn ile kesin olarak kanıtlandı.
+  - Palet eşlemesi: Boş adımda parlak imleç `0x001B`, dolu adımda (hit) parlak vuruş imleci `0x001A`; imleç yokken boş adım `0x0019` (sönük), dolu adım `0x0018` (aktif renk).
+- 32 Adım LED Grid Birleştirici (Compositor) mimarisi sentetik RAM'de kuruldu ve doğrulandı:
+  - Step View'ın mantıksal LED tamponu yerel olarak 32 adımı (64 bayt) eksiksiz tutar.
+  - İlk 16 kayıt (1–16. adımlar): üst 16 pad'e (`grid_output + 0x00`),
+  - İkinci 16 kayıt (17–32. adımlar): alt 16 pad'e (`grid_output + 0x20`) `0x08022CF0` (memcpy) ile birleştirilir.
+- Playhead (playback cursor) imlecinin 1'den 32'ye kesintisiz akışı Unicorn sentetik RAM'de 32 adım boyunca adım adım simüle edildi:
+  - Üst satırdan alt satıra geçişte (Adım 15 -> 16) kesinti, gecikme veya imleç kopması olmadan akış kanıtlandı.
+  - Cursor üst yarıdayken alt yarıda, alt yarıdayken üst yarıda kesin izolasyon doğrulandı (asla çift yanma oluşmaz).
+- Mod bağımsızlığı ve orijinal alt pad koruma doğrulaması:
+  - Note (`mode 0` alt görünümü) veya Velocity (`mode 2`, `[grid + 0x9C]`) moduna geçildiğinde alt 16 pad'in o modun kendi alt subview LED tamponunu (`bottom_view + r7`) yansıttığı ve pad düzeninin bozulmadığı bayt bayt kanıtlandı.
+  - Grid Container `[grid + 0x258]` track store dizisi ve `0x080588AC` kontrol akışı tespit edilerek sentetik ortama entegre edildi.
+- `tests/test_led_compositor.py` test paketi eklendi (5 yeni kapsamlı test, toplam test sayısı 32'ye yükseldi; 32/32 test PASS):
+  - `test_stock_step_view_led_getter_and_compositor_split`: Stok getter ve compositor ayrım mekanizması.
+  - `test_step_view_32step_logical_led_buffer_mapping`: 32 adımlık mantıksal LED tamponunun 32 pad ile 1-e-1 eşlenmesi.
+  - `test_playhead_continuous_flow_across_32_steps`: Playhead'in 1'den 32'ye kesintisiz akışı ve satır izolasyonu.
+  - `test_other_modes_preserve_original_bottom_pad_layout`: Note ve Velocity modlarında alt pad orijinal düzeninin korunması.
+  - `test_compositor_memory_safety_and_no_overflow`: Compositor bellek güvenliği, sınır koruması ve `view + 0xB4` bütünlüğü.
+- `docs/UI-TRACE-5706.md` ve `docs/STATUS.md` güncellendi.
+- Fiziksel donanıma hiçbir erişim yapılmadı.
+
 ## 32 Pad Step Yönlendirmesi (Routing), Sayfa Mantığı ve Taşma Koruması (Adım 4) — 2026-10-25
 - Grid Container alt/üst yönlendirmesi (`0x0804D7A0` / `0x0804D7DE`, `0x0804DC86`, `0x0804DF3E`) ve Step View sayfa ofseti (`0x0805CB04`, `0x0805CCF0`) detaylı incelendi.
 - Step View bellek yapısının (`view + 0x74..0xB2` durum dizisi, `view + 0xB8` pending maskesi, `view + 0xC0` held maskesi, 64 bayt LED tamponu, ST1 ve ST2 32-entry dizileri) 32 adımı yerel olarak zaten barındırdığı; sorunun Grid Container'ın `pad >= 16`'yı alt görünüme yönlendirmesi ve Step View'ın sayfa durumunda eklediği `+16` ofsetinden kaynaklandığı ortaya kondu.
