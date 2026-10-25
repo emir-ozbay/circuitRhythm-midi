@@ -237,6 +237,15 @@ def ldr_lit_w(rt: int, off: int) -> bytes:
     return h(0xF85F | (0x80 if off >= 0 else 0)) + h(rt << 12 | abs(off))
 
 
+def adr(addr: int, target: int, rd: int) -> bytes:
+    """ADR Rd, label (T1, 16-bit, word-aligned forward offset 0..1020 from Align(PC, 4))."""
+    _lo(rd)
+    base_pc = (addr + 4) & ~3
+    off = target - base_pc
+    assert off % 4 == 0 and 0 <= off <= 1020, hex(off)
+    return h(0xA000 | rd << 8 | (off // 4))
+
+
 # ---- Move / Immediate / Arithmetic / Logical -------------------------------
 
 def movs_imm(rd: int, imm: int) -> bytes:
@@ -455,18 +464,20 @@ def push(regs: Union[Iterable[int], int] = (), lr: bool = False) -> bytes:
     return h(0xE92D) + h(m)
 
 
-def pop(regs: Union[Iterable[int], int] = (), pc: bool = False) -> bytes:
-    """POP helper supporting r0..r7 (16-bit T1) or r0..r12 (32-bit POP.W T2)."""
+def pop(regs: Union[Iterable[int], int] = (), pc: bool = False, lr: bool = False) -> bytes:
+    """POP helper supporting r0..r7 (16-bit T1) or r0..r12/lr (32-bit POP.W T2)."""
     if isinstance(regs, int):
         reg_list = [regs]
     else:
         reg_list = list(regs)
-    if all(0 <= r <= 7 for r in reg_list):
+    if not lr and all(0 <= r <= 7 for r in reg_list):
         return pop_list(reg_list, pc=pc)
     m = 0
     for r in reg_list:
         _reg(r)
         m |= 1 << r
+    if lr:
+        m |= 1 << 14
     if pc:
         m |= 1 << 15
     assert m != 0, "pop requires at least one register"
@@ -578,7 +589,7 @@ def raw(data: bytes) -> bytes:
 # Expose `str` helper as requested for Thumb STR instruction encoding
 str = str_mem  # noqa: A001
 
-_PC_REL_BRANCHES = {b_cond: 2, b: 2, cbz: 2, cbnz: 2, bl: 4, b_w: 4, b_cond_w: 4}
+_PC_REL_BRANCHES = {b_cond: 2, b: 2, cbz: 2, cbnz: 2, adr: 2, bl: 4, b_w: 4, b_cond_w: 4}
 _FIXED_SIZE_4 = {
     bl, cmp_w_imm, b_w, b_cond_w, movw, movt,
     ldr_w, str_w, ldrb_w, strb_w, ldrh_w_imm, strh_w_imm, strh_w_reg_lsl1,

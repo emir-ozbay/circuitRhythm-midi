@@ -26,14 +26,54 @@
 
 ## Sonraki tek somut görev
 
-**M4 Adımı:** Mod geçişi (`seq_enabled`), `grid_mode == 0`'da 32 pad -> Step View yönlendirmesi (`0x0804DC86`, `0x0804DF3E`), sayfa ofsetinin `grid_mode == 0`'da `0`'a kilitlenmesi (`0x0805CB04`, `0x0805CCF0`) ve sahiplik temizliği (`view + 0xB8`, `view + 0xC0`, `view + 0x74` bit 3) makine kodu yamalarını `src/seq_Patch.py` içine ekleyip Unicorn emülatöründe doğrulamak.
+**M4 Devamı (Mod Geçiş Kısayolu ve Proje/Ses Susturma):** Normal Mod ile Sequencer Only Modu arasında geçiş sağlayan güvenli buton kısayolunu (Shift kombinasyonu), Sequencer modunda dahili sample motoru tetiklemesini susturmayı (`0x08031A19` / `0x080467D2`), bağımsız 32 Sequencer projesi için sayfa kilidini (`[proj_view + 0x36]`) ve Packs kilidini (`0x0803DB54`) `src/seq_patch.py` içine ekleyip Unicorn'da doğrulamak.
 
-## Tamamlanan Son Aşama (M3 Adım 1 & Adım 2 — TAMAMLANDI)
+## Tamamlanan Son Aşama (M4 Adım 5 — Basılı Tutarken Sahiplik Temizliği Makine Kodu — TAMAMLANDI)
 
-- **M3 Adım 1:** `scripts/patch_firmware.py` code-cave desteği (`FLASH_END = 0x08080000`, 4-bayt hizalama, dinamik boyut ve MPEG-2 CRC-32 header güncellemesi) ve `tests/test_patcher.py` içindeki 6 yeni test (`TestCodeCaveSupport`) tamamlandı.
-- **M3 Adım 2:**
-  - `src/thumb_asm.py`: MIT lisanslı Thumb/Thumb-2 makine kodu üreticisi (`Asm`, `bl`, `b_w`, `push`, `pop`, `ldr`, `str`, `ldrb`, `strb`, `movw`, `movt` vb.) oluşturuldu.
-  - `src/seq_Patch.py`: `CODE_CAVE_BASE = 0x0806A570`, `SEQ_STATE_ADDR = 0x2004F660` (256 bayt, `MAGIC = 0x31514553` `"SEQ1"`), durum bloğu ofsetleri (`+0x00` `magic`, `+0x04` `seq_enabled`, `+0x05` `last_normal_proj`, `+0x06` `last_seq_proj = 32`, `+0x08` `grid_ptr`) ve `c_seq_state()` Thumb-2 makine kodu üreticisi tamamlandı.
-  - `tests/test_seq_state.py`: Capstone disassembly ve Unicorn emülasyon testleri (8 yeni test: normal rezervasyon, ikinci çağrıda durum koruma, tam sınır `current == 0x2004F660`, dolu heap `current > 0x2004F660`, beklenmeyen limit reddi, bozuk magic kurtarma ve stok bump allocator `0x08025A98` entegrasyonu) eklendi.
-- **Komut ve Sonuç:** `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` -> **46 testin tamamı PASS** (0 hata). `analysis/` ve `stock/` altındaki hiçbir dosya değiştirilmedi.
-- **Başarısız Hipotezler / Açık Riskler:** Başarısız hipotez yok. Açık risk olarak M4–M6 kancalarının gerçek RTOS görev sıralaması ve yığın kullanımı Unicorn testleriyle adım adım doğrulanmaya devam edecektir.
+- **Değiştirilen Dosyalar:**
+  - `src/seq_patch.py` (ve `src/seq_Patch.py`):
+    - `STOCK_GRID_MODE_UPDATE = 0x0804DAAC` ve `STOCK_STEP_LED_CALC = 0x0805CF24` tanımlandı.
+    - `HOOK_GRID_MODE_CLEANUP = 0x0804D6E0` (`EXPECTED_GRID_MODE_CLEANUP = 00 f0 e4 f9`, `bl #0x804daac`) kancası eklendi.
+    - `emit_grid_mode_cleanup(a: Asm)` fonksiyonu eklendi:
+      * Grid Container mod/track güncelleme fonksiyonu `0x0804D6B6` içinde `0x0804D6E0` adresindeki çağrıyı kancalar.
+      * Orijinal `0x0804DAAC` fonksiyonuna giden 5. stack argümanını güvenle aktarır (`ldr.w ip, [sp]; push {r4..r8, lr}; sub sp, #8; str.w ip, [sp]; bl 0x0804daac; add sp, #8`).
+      * `[r5 + 0x228]` (Grid fiziksel basılı pad maskesi) sıfırlanır.
+      * 8 track (`t = 0..7`) taranarak `view = [r5 + 0x74 + 4*t]` kontrol edilir; `view != 0` ve (`[view + 0xB8] != 0` veya `[view + 0xC0] != 0`) ise:
+        - `[view + 0xB8] = 0` (pending toggle maskesi) ve `[view + 0xC0] = 0` (held pad maskesi) sıfırlanır.
+        - 32 adım (`s = 0..31`) döngüsüyle `view + 0x74 + 2*s` durum word'ünde `bit 3` (`0x0008`) set ise `bics` ile temizlenir ve `0x0805CF24(view, s)` çağrılarak adımın LED rengi parlak beyazdan normal renge döndürülür.
+      * `pop {r4..r8, lr}; bx lr` ile çağrıcının yazmaçları (`r4=8`, `r5=grid`, `r6=grid+0x260`, `r7=mode`, `r8=grid+0x238`) ve dönüş adresi eksiksiz geri yüklenir.
+    - `build_step_routing_patches()`: 9 in-place Thumb-2 `BL` kancasını ve code cave yamasını üretir.
+  - `tests/test_step_routing.py`:
+    - `test_patched_hooks_and_code_cave_disassembly`: 9 in-place `BL` kancasının tamamını ve code cave yerleşimini Capstone ile doğrular.
+    - `test_held_pad_ownership_cleanup_on_track_or_mode_change`: Pad 5 (üst satır) basılı tutulurken track değiştirildiğinde (`0x0804D6B6`) ve Pad 20 (alt satır) basılı tutulurken `grid_mode = 2` (Velocity) yapıldığında (`0x0804D6B6`), asılı kalan `bit 3`, `view + 0xB8`, `view + 0xC0` ve `grid + 0x228` maskelerinin tertemiz sıfırlandığı ve LED'in normale döndüğü Unicorn'da doğrulandı.
+- **Komut ve Sonuç:** `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` -> **60 testin tamamı PASS** (0 hata). `analysis/` ve `stock/` altındaki hiçbir dosya değiştirilmedi.
+- **Başarısız Hipotezler / Açık Riskler:** İlk derlemede `c_grid_mode_cleanup` çıkışında `pop {r4..r8, pc}` kullanılmıştı; `test_seq_state.py` içindeki `test_c_seq_state_disassembles_cleanly` testi code cave son talimatının `bx lr` olmasını beklediği için `pop {r4..r8, lr}; bx lr` ile hizalandı ve tüm testler geçti. Açık risk olarak mod geçiş kısayolu, proje sayfası kilidi ve dahili ses susturma sırayla ele alınacaktır.
+
+## Tamamlanan Önceki Aşama (M4 Adım 4 — 32-Adım LED Compositor Makine Kodu — TAMAMLANDI)
+
+- **Değiştirilen Dosyalar:**
+  - `src/seq_patch.py`:
+    - `HOOK_COMP_TOP_LEDS = 0x0804DDA4` (`EXPECTED_COMP_TOP_LEDS = 04 f0 b0 f9`, `bl #0x8052108`)
+    - `HOOK_COMP_BOTTOM_MEMCPY = 0x0804DDBE` (`EXPECTED_COMP_BOTTOM_MEMCPY = d4 f7 97 ff`, `bl #0x8022cf0`)
+    - `c_comp_top_leds(r0=sb)`: `c_seq_state()` çağırır; `seq_enabled == 1` ve `grid_mode == 0` (`[r6 + 0x264] == 0`) ise Step View'ın 64 baytlık LED tamponunun başını (`ldr r0, [sb, #4]; ldr r0, [r0]`) döndürür (sayfa 1'de kalınmış olsa dahi üst 16 pad her zaman adım 0..15'i gösterir); aksi halde orijinal `0x08052108(sb)` çağırır.
+    - `c_comp_bottom_memcpy(r0, r1, r2)`: `c_seq_state()` çağırır; `seq_enabled == 1` ve `grid_mode == 0` ise `r1` kaynak adresini Step View'ın ikinci 16 adımıyla (`ldr r1, [sb, #4]; ldr r1, [r1]; adds r1, #0x20`) güncelleyip `0x08022CF0(r0, r1, 0x20)` (`memcpy`) çağırır; aksi halde `r1`'e dokunmadan orijinal `0x08022CF0(r0, r1, 0x20)` çağırır.
+    - `build_step_routing_patches()`: 8 adet in-place 4-baytlık Thumb-2 `BL` kancasını ve genişletilmiş code-cave yamasını üretir.
+  - `tests/test_step_routing.py`:
+    - `test_patched_hooks_and_code_cave_disassembly`: Capstone ile tüm 8 in-place `BL` kancasını ve code-cave yerleşimini doğrular.
+  - `tests/test_led_compositor.py`:
+    - `CompositorTestBase` temel sınıfı oluşturuldu.
+    - `PatchedLedCompositorTests`: Yamanmış 5706 firmware imajı üzerinde doğrudan gerçek stok `0x0804DD1C(grid)` fonksiyonunu çalıştıran 4 test eklendi (`test_patched_compositor_32step_mapping_and_playhead_flow`, `test_patched_compositor_velocity_mode_preserves_bottom_pads`, `test_patched_compositor_normal_mode_seq_disabled`, `test_patched_compositor_memory_safety_and_no_overflow`).
+- **Komut ve Sonuç:** `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` -> **59 testin tamamı PASS** (0 hata). `analysis/` ve `stock/` altındaki hiçbir dosya değiştirilmedi.
+- **Başarısız Hipotezler / Açık Riskler:** İlk çalıştırmada `PatchedLedCompositorTests` `LedCompositorTests`'ten türediği için stok imaj varsayan testleri de çalıştırmıştı; `CompositorTestBase` oluşturularak stok ve yamanmış test sınıfları ayrıştırıldı. Playhead testinde 31. adımın döngü sonrası temizlenmesi sağlandı. Açık riskler sırayla ele alınacaktır.
+
+- **Değiştirilen Dosyalar:**
+  - `src/thumb_asm.py`: 16-bit PC-bağıl `adr` (`ADR Rd, label`) ve 32-bit `pop(..., lr=True)` (`POP.W {..., lr}`) yardımcıları eklendi.
+  - `src/seq_patch.py`:
+    - `c_resolve_subview(r0=grid, r1=pad)`: `c_seq_state()` çağırır, `state != 0` ise `grid` işaretçisini `[state + 0x08]` (`grid_ptr`) içine kaydeder; `seq_enabled == 1` ve `[grid + 0x264] == 0` (`grid_mode == 0`) iken `0x0804DC86(grid, 0)` çağırarak 0..31 arasındaki tüm pad'leri `Step View`'a yönlendirir; diğer modlarda (`grid_mode != 0`) veya `seq_enabled == 0` iken orijinal `0x0804DC86(grid, pad)` çağırır.
+    - `c_transform_pad(r0=grid, r1=pad, r2=track, r3=mode)`: `seq_enabled == 1` ve `r3 == 0` (`mode == 0`) iken `pad & 0x1F` (`0..31`) döndürür; aksi halde orijinal `0x0804DF3E(grid, pad, track, mode)` çağırır.
+    - `c_step_page_read(r0=page_store, r1=0)`: `seq_enabled == 1`, `[state + 0x08]` (`grid_ptr`) geçerli ve `[grid_ptr + 0x264] == 0` (`grid_mode == 0`) iken code-cave içindeki 4-bayt hizalı sabit `c_zero_word` (`0x00000000`) adresini döndürerek sayfa ofsetini `0`'a kilitler (`+16` taşmasını önler); `grid_mode != 0` iken (Velocity, Gate, Note, Pattern Settings vb.) orijinal `0x0803FC58(page_store, 0)` çağırarak `1–16` sayfa tuşunu %100 korur.
+    - `build_step_routing_patches()`: Code-cave yamasını ve 6 adet in-place 4-baytlık Thumb-2 `BL` kancasını (`0x0804D7B6`, `0x0804D7CC`, `0x0804D7FC`, `0x0804D812`, `0x0805CB14`, `0x0805CCFA`) üretir.
+  - `tests/test_step_routing.py`: `PatchedStepRoutingTests` sınıfı eklendi (Capstone kanca doğrulaması, `seq_enabled = 1, grid_mode = 0, page_store = 1` iken 32 pad açma/kapatma ve `view + 0xB4` koruma kanıtı, `grid_mode = 2` Velocity ve `grid_mode = 3` Gate modlarında `1–16` sayfa geçişi ile alt 16 pad yönlendirmesinin korunumu, `seq_enabled = 0` normal mod uyumluluğu).
+- **Komut ve Sonuç:** `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` -> **55 testin tamamı PASS** (0 hata). `analysis/` ve `stock/` altındaki hiçbir dosya değiştirilmedi.
+- **Başarısız Hipotezler / Açık Riskler:** İlk denemede `c_zero_word` öncesi eklenen 2-baytlık `nop` dolgusu `c_seq_state` boyutu (`0x5E`) nedeniyle `c_zero_word` adresini `+2` kaydırdı; `nop` kaldırılarak `0x0806A634` (4-bayt hizalı) adresi doğrulandı. Açık risk olarak M4 sahiplik temizliği, M5 LED compositor ve M6 proje/ses susturma kancaları sırayla Unicorn'da doğrulanacaktır.
+

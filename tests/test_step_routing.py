@@ -23,9 +23,41 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
+
+try:
+    import seq_Patch  # noqa: F401
+except ImportError:
+    pass
+
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_MCLASS
 from inspect_ui import load_image, BASE
-from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_MODE_MCLASS
+from patch_firmware import apply_patches
+from seq_patch import (
+    CODE_CAVE_BASE,
+    HEAP_CUR_PTR,
+    HEAP_LIMIT,
+    HEAP_LIMIT_PTR,
+    HOOK_GRID_MODE_CLEANUP,
+    HOOK_GRID_PRESS_RESOLVE,
+    HOOK_GRID_PRESS_TRANSFORM,
+    HOOK_GRID_RELEASE_RESOLVE,
+    HOOK_GRID_RELEASE_TRANSFORM,
+    HOOK_STEP_PRESS_PAGE,
+    HOOK_STEP_RELEASE_PAGE,
+    HOOK_COMP_TOP_LEDS,
+    HOOK_COMP_BOTTOM_MEMCPY,
+    OFF_GRID_PTR,
+    OFF_SEQ_ENABLED,
+    SEQ_STATE_ADDR,
+    STOCK_GRID_PRESS,
+    STOCK_GRID_RELEASE,
+    arm_code,
+    build_step_routing_patches,
+)
+from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_MODE_MCLASS, UC_HOOK_CODE
 from unicorn.arm_const import (
     UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3,
     UC_ARM_REG_SP, UC_ARM_REG_LR, UC_ARM_REG_PC,
@@ -355,6 +387,350 @@ class StepRoutingTests(unittest.TestCase):
             guarded_step_release(out_of_range_pad)
             # view + 0xB4 must remain completely uncorrupted
             self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+
+class PatchedStepRoutingTests(StepRoutingTests):
+    """Unicorn emulation tests on the patched 5706 firmware image with M4 step routing hooks."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stock_image = load_image()
+        cls.patches = build_step_routing_patches(CODE_CAVE_BASE)
+        cls.image, cls.patches_info, cls.changed_ranges = apply_patches(
+            cls.stock_image, cls.patches
+        )
+        cls.cave_bytes, cls.labels = arm_code(CODE_CAVE_BASE)
+
+    def setUp(self):
+        super().setUp()
+        # Initialize stock bump allocator pointers in RAM
+        self.word(HEAP_LIMIT_PTR, HEAP_LIMIT)
+        self.word(HEAP_CUR_PTR, 0x2004EA98)
+
+    def setup_grid_and_step_view(self, seq_enabled=1, grid_mode=0, track=0):
+        """Sets up a complete Grid Container + Step View + Bottom Subviews environment."""
+        env = self.setup_step_view_environment(active_pattern=0)
+        view = env["view"]
+        page = env["page"]
+
+        grid = 0x20005000
+        track_store = self.store(bytes([track, 0, 0, 0]))
+        self.word(grid + 0x25C, track_store)
+        self.u.mem_write(grid + 0x264, bytes([grid_mode]))
+        self.u.mem_write(grid + 0x228, bytes(4))  # clear held pad bitmask
+
+        # Grid's per-track page object ([grid + 0x19C + track * 4] -> +0x10 -> page store)
+        page_obj = 0x20005400
+        self.word(page_obj + 0x10, page)
+        self.word(grid + 0x19C + track * 4, page_obj)
+
+        # Top subview for track = Step View
+        self.word(grid + 0x74 + track * 4, view)
+
+        # Bottom subviews for mode 0 (+0x14), mode 2 Velocity (+0x9C), mode 3 Gate (+0xBC)
+        bottom_views = {}
+        bottom_events = []
+
+        press_cb = 0x0800E100
+        release_cb = 0x0800E104
+        self.u.mem_write(press_cb, bytes.fromhex("7047"))    # bx lr
+        self.u.mem_write(release_cb, bytes.fromhex("7047"))  # bx lr
+
+        for mode_id, offset, b_addr in ((0, 0x14, 0x20006000), (2, 0x9C, 0x20006100), (3, 0xBC, 0x20006200)):
+            vt_addr = b_addr + 0x40
+            self.word(b_addr, vt_addr)
+            self.word(vt_addr + 0, press_cb | 1)
+            self.word(vt_addr + 4, release_cb | 1)
+            self.word(grid + offset + track * 4, b_addr)
+            bottom_views[mode_id] = b_addr
+
+        def on_bottom_cb(uc, addr, size, data):
+            if addr == press_cb:
+                bottom_events.append((
+                    "press",
+                    uc.reg_read(UC_ARM_REG_R0),
+                    uc.reg_read(UC_ARM_REG_R1),
+                    uc.reg_read(UC_ARM_REG_R2),
+                ))
+            elif addr == release_cb:
+                bottom_events.append((
+                    "release",
+                    uc.reg_read(UC_ARM_REG_R0),
+                    uc.reg_read(UC_ARM_REG_R1),
+                ))
+
+        self.u.hook_add(UC_HOOK_CODE, on_bottom_cb)
+
+        # Initialize Sequencer Mode state block via c_seq_state() and set seq_enabled
+        state_addr = self.call(self.labels["c_seq_state"])
+        self.assertEqual(state_addr, SEQ_STATE_ADDR)
+        self.u.mem_write(SEQ_STATE_ADDR + OFF_SEQ_ENABLED, bytes([seq_enabled]))
+
+        env["grid"] = grid
+        env["bottom_views"] = bottom_views
+        env["bottom_events"] = bottom_events
+        return env
+
+    def test_patched_hooks_and_code_cave_disassembly(self):
+        """Verifies all 9 in-place Thumb-2 BL hooks and code-cave layout via Capstone."""
+        md = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_MCLASS)
+
+        expected_hooks = [
+            (HOOK_GRID_MODE_CLEANUP, self.labels["c_grid_mode_cleanup"]),
+            (HOOK_GRID_PRESS_RESOLVE, self.labels["c_resolve_subview"]),
+            (HOOK_GRID_PRESS_TRANSFORM, self.labels["c_transform_pad"]),
+            (HOOK_GRID_RELEASE_RESOLVE, self.labels["c_resolve_subview"]),
+            (HOOK_GRID_RELEASE_TRANSFORM, self.labels["c_transform_pad"]),
+            (HOOK_STEP_PRESS_PAGE, self.labels["c_step_page_read"]),
+            (HOOK_STEP_RELEASE_PAGE, self.labels["c_step_page_read"]),
+            (HOOK_COMP_TOP_LEDS, self.labels["c_comp_top_leds"]),
+            (HOOK_COMP_BOTTOM_MEMCPY, self.labels["c_comp_bottom_memcpy"]),
+        ]
+        for hook_addr, target_addr in expected_hooks:
+            raw = self.image[hook_addr - BASE : hook_addr - BASE + 4]
+            insns = list(md.disasm(raw, hook_addr))
+            self.assertEqual(len(insns), 1)
+            self.assertEqual(insns[0].mnemonic, "bl")
+            self.assertEqual(insns[0].op_str, f"#{target_addr:#x}")
+
+        # Verify c_zero_word is 4-byte aligned and holds 0x00000000
+        zero_addr = self.labels["c_zero_word"]
+        self.assertEqual(zero_addr % 4, 0)
+        self.assertEqual(self.readword(zero_addr), 0)
+
+    def test_patched_seq_mode_grid_mode_0_32pads_with_page_1_no_overflow(self):
+        """Proves that with seq_enabled=1 and grid_mode=0, even when page_store=1:
+        - All 32 pads (0..31) pressed/released through 0x0804D7A0 / 0x0804D7DE toggle steps 0..31
+          in Step View ON and OFF cleanly.
+        - view + 0xB4 is never corrupted.
+        - Bottom subview is never invoked.
+        """
+        env = self.setup_grid_and_step_view(seq_enabled=1, grid_mode=0, track=0)
+        grid = env["grid"]
+        view = env["view"]
+        leds = env["leds"]
+        patterns = env["patterns"]
+        page = env["page"]
+        bottom_events = env["bottom_events"]
+
+        palette = 0x08062AB0
+        pressed_color = self.image[palette - BASE + 31 * 2 : palette - BASE + 32 * 2]
+
+        # Force page_store to 1 (page 2: steps 17..32) to prove page lock to 0 in grid_mode == 0
+        self.u.mem_write(page + 0x40, bytes([1, 0, 0, 0]))
+        self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+        # --- Cycle 1: Press & Release all 32 pads (0..31) via Grid Container -> Turn ON steps 0..31 ---
+        for pad in range(32):
+            with self.subTest(cycle="turn_on", pad=pad):
+                self.call(STOCK_GRID_PRESS, grid, pad, 96)
+                # Verify grid_ptr captured in state block (+0x08)
+                self.assertEqual(self.readword(SEQ_STATE_ADDR + OFF_GRID_PTR), grid)
+                # Verify held pad bitmask in grid
+                self.assertEqual(self.readword(grid + 0x228), 1 << pad)
+                # Verify Step View status bit 3 (held = 8) on step == pad
+                status_press = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * pad, 2))[0]
+                self.assertEqual(status_press, 8)
+                self.assertEqual(bytes(self.u.mem_read(leds + 2 * pad, 2)), pressed_color)
+                self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+                self.call(STOCK_GRID_RELEASE, grid, pad)
+                self.assertEqual(self.readword(grid + 0x228), 0)
+                status_rel = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * pad, 2))[0]
+                self.assertEqual(status_rel, 2)  # hit active
+                self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+        # Bottom subview must never have been called in grid_mode == 0
+        self.assertEqual(bottom_events, [])
+
+        # All 32 steps must be committed to pattern memory
+        pattern_data = self.u.mem_read(patterns, 32 * 8)
+        for step in range(32):
+            step_bytes = pattern_data[step * 8 : (step + 1) * 8]
+            self.assertEqual(step_bytes[0], 60, f"Step {step} note must be 60")
+            self.assertEqual(step_bytes[3], 96, f"Step {step} velocity must be 96")
+
+        # --- Cycle 2: Press & Release all 32 pads (0..31) via Grid Container -> Turn OFF steps 0..31 ---
+        for pad in range(32):
+            with self.subTest(cycle="turn_off", pad=pad):
+                self.call(STOCK_GRID_PRESS, grid, pad, 96)
+                self.call(STOCK_GRID_RELEASE, grid, pad)
+                status_off = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * pad, 2))[0]
+                self.assertEqual(status_off, 0)
+                self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+        self.assertEqual(bottom_events, [])
+        pattern_data_off = self.u.mem_read(patterns, 32 * 8)
+        for step in range(32):
+            step_bytes = pattern_data_off[step * 8 : (step + 1) * 8]
+            self.assertEqual(step_bytes[3], 0, f"Step {step} velocity must be cleared to 0")
+
+    def test_patched_seq_mode_velocity_and_gate_modes_preserve_page_and_bottom_pads(self):
+        """Proves that with seq_enabled=1 in grid_mode=2 (Velocity) and grid_mode=3 (Gate):
+        - The 1-16 page switch works natively for top pads 0..15 (page 0 -> steps 0..15, page 1 -> steps 16..31).
+        - Bottom pads 16..31 route to the mode's bottom subview with local pad 0..15 (pad - 16).
+        """
+        for grid_mode in (2, 3):
+            with self.subTest(grid_mode=grid_mode):
+                self.setUp()
+                env = self.setup_grid_and_step_view(seq_enabled=1, grid_mode=grid_mode, track=0)
+                grid = env["grid"]
+                view = env["view"]
+                patterns = env["patterns"]
+                page = env["page"]
+                bottom_view = env["bottom_views"][grid_mode]
+                bottom_events = env["bottom_events"]
+
+                # 1. Top pads 0..15 on Page 0 (steps 0..15) and Page 1 (steps 16..31)
+                for page_val, step_offset in ((0, 0), (1, 16)):
+                    self.u.mem_write(page + 0x40, bytes([page_val, 0, 0, 0]))
+                    for pad in range(16):
+                        expected_step = pad + step_offset
+                        self.call(STOCK_GRID_PRESS, grid, pad, 96)
+                        st_press = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * expected_step, 2))[0]
+                        self.assertEqual(st_press, 8)
+                        self.call(STOCK_GRID_RELEASE, grid, pad)
+                        st_rel = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * expected_step, 2))[0]
+                        self.assertEqual(st_rel, 2)
+                        self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+                    # Verify committed steps in pattern memory for this page
+                    for pad in range(16):
+                        expected_step = pad + step_offset
+                        step_bytes = self.u.mem_read(patterns + expected_step * 8, 8)
+                        self.assertEqual(step_bytes[0], 60)
+                        self.assertEqual(step_bytes[3], 96)
+
+                    # Toggle them back OFF on the same page
+                    for pad in range(16):
+                        expected_step = pad + step_offset
+                        self.call(STOCK_GRID_PRESS, grid, pad, 96)
+                        self.call(STOCK_GRID_RELEASE, grid, pad)
+                        st_off = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * expected_step, 2))[0]
+                        self.assertEqual(st_off, 0)
+
+                self.assertEqual(bottom_events, [])
+
+                # 2. Bottom pads 16..31 on both Page 0 and Page 1 route to bottom_view with local_pad = pad - 16
+                for page_val in (0, 1):
+                    self.u.mem_write(page + 0x40, bytes([page_val, 0, 0, 0]))
+                    for pad in range(16, 32):
+                        bottom_events.clear()
+                        self.call(STOCK_GRID_PRESS, grid, pad, 100)
+                        self.call(STOCK_GRID_RELEASE, grid, pad)
+                        self.assertEqual(
+                            bottom_events,
+                            [
+                                ("press", bottom_view, pad - 16, 100),
+                                ("release", bottom_view, pad - 16),
+                            ],
+                        )
+                        # Step View must remain completely untouched by bottom pad presses in mode 2/3
+                        for step in range(32):
+                            st = struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * step, 2))[0]
+                            self.assertEqual(st, 0)
+                        self.assertEqual(self.u.mem_read(view + 0xB4, 4), bytes(4))
+
+    def test_patched_normal_mode_seq_disabled_preserves_stock_behavior(self):
+        """Proves that when seq_enabled=0 (Normal Mode) in grid_mode=0:
+        - Top pads 0..15 route to Step View with normal page 0/1 switching.
+        - Bottom pads 16..31 route to the bottom Note/Sample subview with stock local pad transformation.
+        """
+        env = self.setup_grid_and_step_view(seq_enabled=0, grid_mode=0, track=0)
+        grid = env["grid"]
+        view = env["view"]
+        page = env["page"]
+        bottom_view = env["bottom_views"][0]
+        bottom_events = env["bottom_events"]
+
+        # Page 1 on top pad 0 -> step 16 in Step View
+        self.u.mem_write(page + 0x40, bytes([1, 0, 0, 0]))
+        self.call(STOCK_GRID_PRESS, grid, 0, 96)
+        self.call(STOCK_GRID_RELEASE, grid, 0)
+        self.assertEqual(struct.unpack("<H", self.u.mem_read(view + 0x74 + 2 * 16, 2))[0], 2)
+        self.assertEqual(bottom_events, [])
+
+        # Bottom pad 16 on Page 0 -> bottom_view with local_pad 0; on Page 1 -> local_pad 16
+        for page_val, expected_local in ((0, 0), (1, 16)):
+            self.u.mem_write(page + 0x40, bytes([page_val, 0, 0, 0]))
+            bottom_events.clear()
+            self.call(STOCK_GRID_PRESS, grid, 16, 80)
+            self.call(STOCK_GRID_RELEASE, grid, 16)
+            self.assertEqual(
+                bottom_events,
+                [
+                    ("press", bottom_view, expected_local, 80),
+                    ("release", bottom_view, expected_local),
+                ],
+            )
+
+    def test_held_pad_ownership_cleanup_on_track_or_mode_change(self):
+        """Validates that holding a pad while changing tracks or switching view mode (0x0804D6B6)
+        cleanly clears grid+0x228, view+0xB8, view+0xC0, status bit 3 (held), and restores normal LED color.
+        """
+        env = self.setup_grid_and_step_view(seq_enabled=1, grid_mode=0, track=0)
+        grid = env["grid"]
+        view0 = env["view"]
+        leds0 = env["leds"]
+
+        # Setup Track 1 Step View on grid
+        env1 = self.setup_step_view_environment(active_pattern=0)
+        view1 = env1["view"]
+        self.word(grid + 0x74 + 1 * 4, view1)
+
+        # Configure Grid container vtable and store arrays expected by 0x0804D6B6
+        self.word(grid, 0x080678DC)
+        dummy_store = self.store(bytes(16))
+        self.word(grid + 0x260, dummy_store)
+        for i in range(8):
+            self.word(grid + 0x238 + i * 4, self.store(bytes(16)))
+        for i in range(8):
+            obj = self.store(bytes(0x100))
+            self.u.mem_write(obj + 0x50, bytes([1]))  # allows 0x0805814E to return cleanly
+            self.word(grid + 0x1C4 + i * 4, obj)
+
+        palette = 0x08062AB0
+        pressed_color = self.image[palette - BASE + 31 * 2 : palette - BASE + 32 * 2]
+
+        # Scenario 1: Pad 5 (top half, step 5) held on Track 0 when switching tracks
+        self.call(STOCK_GRID_PRESS, grid, 5, 96)
+        self.assertEqual(self.readword(grid + 0x228), 1 << 5)
+        self.assertEqual(self.readword(view0 + 0xB8), 1 << 5)
+        self.assertEqual(self.readword(view0 + 0xC0), 1 << 5)
+        st5_press = struct.unpack("<H", self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0]
+        self.assertEqual(st5_press, 8)
+        self.assertEqual(bytes(self.u.mem_read(leds0 + 2 * 5, 2)), pressed_color)
+
+        # Track change: calls 0x0804D6B6(grid, 0)
+        self.call(0x0804D6B6, grid, 0)
+
+        # Verify all held bits and masks are cleanly cleared and LED returned to normal
+        self.assertEqual(self.readword(grid + 0x228), 0)
+        self.assertEqual(self.readword(view0 + 0xB8), 0)
+        self.assertEqual(self.readword(view0 + 0xC0), 0)
+        st5_after = struct.unpack("<H", self.u.mem_read(view0 + 0x74 + 2 * 5, 2))[0]
+        self.assertEqual(st5_after & 8, 0)
+        self.assertNotEqual(bytes(self.u.mem_read(leds0 + 2 * 5, 2)), pressed_color)
+
+        # Scenario 2: Pad 20 (bottom half, step 20 in 32-pad mode) held on Track 0 when switching to Velocity mode
+        self.call(STOCK_GRID_PRESS, grid, 20, 96)
+        self.assertEqual(self.readword(grid + 0x228), 1 << 20)
+        self.assertEqual(self.readword(view0 + 0xB8), 1 << 20)
+        self.assertEqual(self.readword(view0 + 0xC0), 1 << 20)
+        st20_press = struct.unpack("<H", self.u.mem_read(view0 + 0x74 + 2 * 20, 2))[0]
+        self.assertEqual(st20_press, 8)
+        self.assertEqual(bytes(self.u.mem_read(leds0 + 2 * 20, 2)), pressed_color)
+
+        # View mode change: calls 0x0804D6B6(grid, 2) (mode 2 = Velocity)
+        self.call(0x0804D6B6, grid, 2)
+
+        # Verify all held bits and masks are cleanly cleared and LED returned to normal
+        self.assertEqual(self.readword(grid + 0x228), 0)
+        self.assertEqual(self.readword(view0 + 0xB8), 0)
+        self.assertEqual(self.readword(view0 + 0xC0), 0)
+        st20_after = struct.unpack("<H", self.u.mem_read(view0 + 0x74 + 2 * 20, 2))[0]
+        self.assertEqual(st20_after & 8, 0)
+        self.assertNotEqual(bytes(self.u.mem_read(leds0 + 2 * 20, 2)), pressed_color)
 
 
 if __name__ == "__main__":

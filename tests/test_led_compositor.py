@@ -16,7 +16,20 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from inspect_ui import load_image, BASE
+from patch_firmware import apply_patches
+from seq_Patch import (
+    CODE_CAVE_BASE,
+    HEAP_CUR_PTR,
+    HEAP_LIMIT,
+    HEAP_LIMIT_PTR,
+    OFF_GRID_PTR,
+    OFF_SEQ_ENABLED,
+    SEQ_STATE_ADDR,
+    SEQ_STATE_MAGIC,
+    build_step_routing_patches,
+)
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_MODE_MCLASS
 from unicorn.arm_const import (
     UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3,
@@ -27,7 +40,7 @@ REGS = [UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3]
 STOP = 0x0800F000
 
 
-class LedCompositorTests(unittest.TestCase):
+class CompositorTestBase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.image = load_image()
@@ -148,6 +161,9 @@ class LedCompositorTests(unittest.TestCase):
         self.u.emu_start(addr | 1, STOP, count=50000)
         self.assertEqual(self.u.reg_read(UC_ARM_REG_PC), STOP)
         return self.u.reg_read(UC_ARM_REG_R0)
+
+
+class LedCompositorTests(CompositorTestBase):
 
     def composite_grid(self, sequencer_only_mode=False):
         """Executes grid composition.
@@ -351,6 +367,168 @@ class LedCompositorTests(unittest.TestCase):
         self.assertEqual(canary_after, bytes([0xCE] * 12))
 
         # Critical: Step View 0xB4 control byte must remain 0
+        self.assertEqual(self.readword(self.step_view + 0xB4), 0)
+
+
+class PatchedLedCompositorTests(CompositorTestBase):
+    """Unicorn emulation tests of the real stock compositor (0x0804DD1C) on the patched firmware image.
+
+    Verifies the Thumb-2 machine code hooks (0x0804DDA4 -> c_comp_top_leds, 0x0804DDBE -> c_comp_bottom_memcpy):
+    1. seq_enabled = 1, grid_mode = 0: a single 0x0804DD1C(grid) call composites:
+       - Top 16 pads: steps 0..15
+       - Bottom 16 pads: steps 16..31
+       - Playhead (status bit 0) seamlessly flows across 0..31 with full row isolation.
+       - Even if page_store is 1 (page 2), top pads show steps 0..15 without page shift.
+    2. seq_enabled = 1, grid_mode = 2 (Velocity): a single 0x0804DD1C(grid) call composites:
+       - Top 16 pads: Step View steps 0..15
+       - Bottom 16 pads: Velocity View LED buffer (self.vel_bytes[:32]).
+    3. seq_enabled = 0, grid_mode = 0 (Normal Mode): 100% stock behavior:
+       - Page 0: steps 0..15 on top, Note View on bottom.
+       - Page 1: steps 16..31 on top, Note View on bottom.
+    4. Memory safety: no buffer overflow past grid_led_buf, view+0xB4 intact.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.stock_image = load_image()
+        cls.patches = build_step_routing_patches(CODE_CAVE_BASE)
+        cls.image, cls.patches_info, cls.changed_ranges = apply_patches(
+            cls.stock_image, cls.patches
+        )
+
+    def setUp(self):
+        super().setUp()
+        # Initialize bump allocator pointers in RAM
+        self.word(HEAP_LIMIT_PTR, HEAP_LIMIT)
+        self.word(HEAP_CUR_PTR, 0x2004EA98)
+
+        # Initialize safe Sequencer Mode state block at SEQ_STATE_ADDR
+        self.word(SEQ_STATE_ADDR, SEQ_STATE_MAGIC)
+        self.u.mem_write(SEQ_STATE_ADDR + OFF_SEQ_ENABLED, bytes([1]))  # Default: seq_enabled = 1
+        self.word(SEQ_STATE_ADDR + OFF_GRID_PTR, self.grid)
+        self.word(HEAP_LIMIT_PTR, SEQ_STATE_ADDR)
+
+    def test_patched_compositor_32step_mapping_and_playhead_flow(self):
+        """Verifies that a single call to real stock compositor 0x0804DD1C correctly composites 32 steps."""
+        # 1. Setup 32-step logical LED buffer (hit on even steps, empty on odd steps)
+        for s in range(32):
+            status = 2 if (s % 2 == 0) else 0
+            self.u.mem_write(self.step_view + 0x74 + s * 2, struct.pack("<H", status))
+            self.call(0x0805CF24, self.step_view, s)
+
+        step_buf_data = self.u.mem_read(self.step_led_buf, 64)
+
+        # Call real patched compositor 0x0804DD1C with a single execution (no Python helper!)
+        self.call(0x0804DD1C, self.grid)
+        grid_data = self.u.mem_read(self.grid_led_buf, 64)
+
+        # Top 16 pads must match steps 0..15
+        self.assertEqual(grid_data[:32], step_buf_data[:32])
+        # Bottom 16 pads must match steps 16..31
+        self.assertEqual(grid_data[32:64], step_buf_data[32:64])
+
+        # 2. Continuous playhead flow across all 32 steps (0 to 31)
+        for cursor in range(32):
+            with self.subTest(cursor=cursor):
+                prev_cursor = (cursor - 1) % 32
+                prev_status = 2 if (prev_cursor % 2 == 0) else 0
+                self.u.mem_write(self.step_view + 0x74 + prev_cursor * 2, struct.pack("<H", prev_status))
+                self.call(0x0805CF24, self.step_view, prev_cursor)
+
+                curr_status = (2 if (cursor % 2 == 0) else 0) | 1
+                self.u.mem_write(self.step_view + 0x74 + cursor * 2, struct.pack("<H", curr_status))
+                self.call(0x0805CF24, self.step_view, cursor)
+
+                # Single execution of 0x0804DD1C
+                self.call(0x0804DD1C, self.grid)
+                frame = self.u.mem_read(self.grid_led_buf, 64)
+
+                for pad in range(32):
+                    color = struct.unpack_from("<H", frame, pad * 2)[0]
+                    is_hit = (pad % 2 == 0)
+                    if pad == cursor:
+                        expected = 0x001A if is_hit else 0x001B
+                        self.assertEqual(color, expected, f"Pad {pad} expected playhead {hex(expected)}, got {hex(color)}")
+                    else:
+                        expected = 0x0018 if is_hit else 0x0019
+                        self.assertEqual(color, expected, f"Pad {pad} expected non-playhead {hex(expected)}, got {hex(color)}")
+
+                # Row isolation
+                if cursor < 16:
+                    for pad in range(16, 32):
+                        c = struct.unpack_from("<H", frame, pad * 2)[0]
+                        self.assertNotIn(c, (0x001A, 0x001B), f"Bottom pad {pad} improperly lit by top playhead")
+                else:
+                    for pad in range(0, 16):
+                        c = struct.unpack_from("<H", frame, pad * 2)[0]
+                        self.assertNotIn(c, (0x001A, 0x001B), f"Top pad {pad} improperly lit by bottom playhead")
+
+        # Clean up playhead cursor on step 31 so step_view matches step_buf_data
+        status31 = 2 if (31 % 2 == 0) else 0
+        self.u.mem_write(self.step_view + 0x74 + 31 * 2, struct.pack("<H", status31))
+        self.call(0x0805CF24, self.step_view, 31)
+
+        # 3. Page store = 1 resilience: even if page_store is toggled to page 1, top pads stay on steps 0..15!
+        self.u.mem_write(self.page_store + 0x40, bytes([1, 0, 0, 0]))
+        self.call(0x0804DD1C, self.grid)
+        p1_grid = self.u.mem_read(self.grid_led_buf, 64)
+        # Top 16 pads STILL show steps 0..15 (not shifted to 16..31)
+        self.assertEqual(p1_grid[:32], step_buf_data[:32])
+        # Bottom 16 pads show steps 16..31
+        self.assertEqual(p1_grid[32:64], step_buf_data[32:64])
+
+    def test_patched_compositor_velocity_mode_preserves_bottom_pads(self):
+        """Verifies that in Velocity Mode (grid_mode = 2), bottom pads show Velocity LEDs, not Step View."""
+        # Setup distinct Step View buffer
+        step_pattern = bytes([0x10 + i for i in range(64)])
+        self.u.mem_write(self.step_led_buf, step_pattern)
+
+        # Set Mode 2 (Velocity)
+        self.u.mem_write(self.grid + 0x264, bytes([2]))
+
+        # Call real patched compositor 0x0804DD1C
+        self.call(0x0804DD1C, self.grid)
+        grid_data = self.u.mem_read(self.grid_led_buf, 64)
+
+        # Top 16 pads: Step View Page 0 (steps 0..15)
+        self.assertEqual(grid_data[:32], step_pattern[:32])
+        # Bottom 16 pads: Velocity View LED buffer
+        self.assertEqual(grid_data[32:64], self.vel_bytes[:32])
+
+    def test_patched_compositor_normal_mode_seq_disabled(self):
+        """Verifies that with seq_enabled = 0, stock compositor behavior is 100% preserved."""
+        step_pattern = bytes([0x20 + i for i in range(64)])
+        self.u.mem_write(self.step_led_buf, step_pattern)
+
+        # Disable sequencer mode
+        self.u.mem_write(SEQ_STATE_ADDR + OFF_SEQ_ENABLED, bytes([0]))
+        self.u.mem_write(self.grid + 0x264, bytes([0]))
+
+        # Page 0
+        self.u.mem_write(self.page_store + 0x40, bytes([0, 0, 0, 0]))
+        self.call(0x0804DD1C, self.grid)
+        out0 = self.u.mem_read(self.grid_led_buf, 64)
+        self.assertEqual(out0[:32], step_pattern[:32])        # Top: steps 0..15
+        self.assertEqual(out0[32:64], self.note_bytes[:32])    # Bottom: Note page 0
+
+        # Page 1
+        self.u.mem_write(self.page_store + 0x40, bytes([1, 0, 0, 0]))
+        self.call(0x0804DD1C, self.grid)
+        out1 = self.u.mem_read(self.grid_led_buf, 64)
+        self.assertEqual(out1[:32], step_pattern[32:64])      # Top: steps 16..31
+        self.assertEqual(out1[32:64], self.note_bytes[32:64])  # Bottom: Note page 1
+
+    def test_patched_compositor_memory_safety_and_no_overflow(self):
+        """Verifies buffer boundaries, view+0xB4 integrity, and no adjacent heap corruption on patched code."""
+        canary = bytes([0xCE] * 32)
+        self.u.mem_write(self.grid_led_buf + 64, canary)
+        self.word(self.step_view + 0xB4, 0)
+
+        for _ in range(5):
+            self.call(0x0804DD1C, self.grid)
+
+        canary_after = self.u.mem_read(self.grid_led_buf + 0x54, 12)
+        self.assertEqual(canary_after, bytes([0xCE] * 12))
         self.assertEqual(self.readword(self.step_view + 0xB4), 0)
 
 
