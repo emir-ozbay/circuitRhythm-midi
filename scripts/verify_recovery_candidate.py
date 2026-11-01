@@ -36,6 +36,8 @@ import test_project_load_guard as load_guard_tests
 import test_project_load_recovery as load_recovery_tests
 import test_recovery_load as load_tests
 import test_recovery_load_reentry as load_reentry_tests
+import test_recovery_usb_lifecycle as usb_lifecycle_tests
+import test_recovery_native_tie as native_tie_tests
 import midi_recovery_patch as fixed
 import verify_phase1_candidate as phase
 from patch_firmware import unpack_syx
@@ -141,6 +143,12 @@ def verify(out,*,core_only=False):
         @classmethod
         def setUpClass(cls):
             super().setUpClass();assert cls.image==image;cls.image=image
+    class PackagedUsbLifecycle(usb_lifecycle_tests.RecoveryUsbLifecycleTests):
+        @classmethod
+        def setUpClass(cls):cls.image,cls.labels=image,labels
+    class PackagedNativeTie(native_tie_tests.RecoveryNativeTieTests):
+        @classmethod
+        def setUpClass(cls):cls.image=image
     def load_case(mode):
         return type(f'PackagedLoad{mode}',(load_tests.RecoveryLoadTests,),
             dict(mode=mode,setUpClass=classmethod(lambda cls:setattr(cls,'image',image))))
@@ -174,6 +182,7 @@ def verify(out,*,core_only=False):
                                  unittest.defaultTestLoader.loadTestsFromTestCase(PackagedTie),
                                  unittest.defaultTestLoader.loadTestsFromTestCase(PackagedLoadGuard),
                                  unittest.defaultTestLoader.loadTestsFromTestCase(PackagedLoadRecovery),
+                                 unittest.defaultTestLoader.loadTestsFromTestCase(PackagedUsbLifecycle),
                                  *([] if core_only else [unittest.defaultTestLoader.loadTestsFromTestCase(PackagedViews),
                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedNotes),
                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedPatternSettings),
@@ -183,6 +192,7 @@ def verify(out,*,core_only=False):
                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedTimer),
                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedGate),
                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedRunningEdit),
+                                                         unittest.defaultTestLoader.loadTestsFromTestCase(PackagedNativeTie),
                                                         *(unittest.defaultTestLoader.loadTestsFromTestCase(load_case(m)) for m in (0,1)),
                                                         *(unittest.defaultTestLoader.loadTestsFromTestCase(load_reentry_case(m)) for m in (0,1)),
                                                         *(unittest.defaultTestLoader.loadTestsFromTestCase(dense_case(m,b)) for m in (0,1) for b in (True,False))])])

@@ -21,6 +21,7 @@ def exercise_load_recovery(s,timer,mode,*,progress=None):
         return dict(**s.snapshot(),taint=u.mem_read(seq.ST+seq.OFF_PROJECT_TAINTED,1)[0],
             recovery_stage=u.mem_read(seq.ST+guard.STAGE,1)[0],epoch=h.read(seq.ST+guard.EPOCH),
             recovery_held=h.read(seq.ST+guard.HELD),controller_pads=h.read(s.ctrl+0x9C),
+            controller_buttons=h.read(s.ctrl+0xA0),
             active_view=s.value(h.read(s.ctrl+0x14)),active_slot=s.value(h.read(s.project+0x44),11)&255,
             page=u.mem_read(s.projects+0x36,1)[0])
     def observe(uc,pc,size,_):
@@ -66,7 +67,14 @@ def exercise_load_recovery(s,timer,mode,*,progress=None):
             assert before[key]==after[key],(key,before,after)
     stage='ready_rejections';button(26);assert state()['active_view']==6
     before=state();s.input('button_down',27);pad(1);s.input('button_up',27)
-    assert state()['io_count']==before['io_count'] and state()['raw_sha256']==before['raw_sha256']
+    for btn in (26,17,16,25,23,24,1,8,18,21,22):
+        button(btn)
+    for btn,want in ((19,1),(20,0),(19,1),(20,0)):
+        button(btn);assert state()['page']==want and state()['controller_buttons']==0
+    after_rejections=state()
+    assert after_rejections['active_view']==6 and after_rejections['transport']==0 and after_rejections['controller_buttons']==0
+    assert after_rejections['io_count']==before['io_count'] and after_rejections['raw_sha256']==before['raw_sha256']
+    assert after_rejections['nor_mutations']==before['nor_mutations']
     mode_check(mode)
     stage='ui_retry_short_read';armed=True;update();pad(1)
     assert state()['recovery_stage']==guard.RETRY and state()['recovery_held']==state()['controller_pads']==0
@@ -102,7 +110,9 @@ def exercise_load_recovery(s,timer,mode,*,progress=None):
     close_events=[e for e in events if e['pc']==g['close_done']]
     assert [e['cookie'] for e in close_events]==[1,2,3]
     assert all(e['regs'][2]==0 and e['state']['recovery_stage']==guard.CLOSING for e in close_events)
-    queued=[e for e in events if e['pc']==guard.NATIVE_CLOSE]
+    all_closes=[e for e in events if e['pc']==guard.NATIVE_CLOSE]
+    queued=[e for e in all_closes if e['regs'][1]==g['close_done']|1]
+    assert len(all_closes)==4 and all_closes[0]['stage']=='setup' and all_closes[0]['regs'][1]==0x08047315
     assert len(queued)==3
     for q,c in zip(queued,close_events):
         assert q['regs'][1]==g['close_done']|1 and q['regs'][2]==c['cookie']
@@ -118,8 +128,9 @@ def exercise_load_recovery(s,timer,mode,*,progress=None):
     for st,slot in (('ui_retry_short_read',1),('ui_full_retry_held',1),('stock_ui_short_read',1),('ui_new_page1',33)):
         loads=[e for e in events if e['stage']==st and e['pc']==guard.NATIVE_LOAD]
         assert len(loads)==1 and loads[0]['regs'][:3]==[s.project,slot,1] and loads[0]['primask']==0
-    for pc in (guard.NEW_SITE,0x08032DB2,0x080378C6):
+    for pc in (guard.NEW_SITE,0x08032DB2):
         assert len([e for e in events if e['stage']=='ui_new_page1' and e['pc']==pc])==1
+    assert len([e for e in events if e['stage']=='ui_new_page1' and e['pc']==0x080378C6])==2
     assert len(setup['uart']['interrupts'])==setup['uart']['used_credits']
     assert h.validate_stacks() and bytes(u.mem_read(BASE,len(s.image)))==s.image
     for hook in hooks:u.hook_del(hook)

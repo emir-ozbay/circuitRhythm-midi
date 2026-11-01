@@ -6,8 +6,8 @@ Only its successful read/New callback and complete native apply clear taint.
 from patch_firmware import PatchHunk
 from thumb_asm import (Asm,b_w,b_cond_w,bl,cmp_imm,cmp_reg,ldr_imm,ldr_w,ldr_reg,
     ldr_sp,ldrb_w,ldrh_imm,mov_reg,movs_imm,movw,movt,pop,push,raw,str_imm,
-    strb_w,tst_reg,adds_imm8,subs_imm8,ands_reg,lsls_imm,lsrs_imm,adds_reg,
-    sub_sp_imm,add_sp_imm)
+    strb_w,tst_reg,adds_imm8,subs_imm8,ands_reg,bics_reg,lsls_imm,lsrs_imm,
+    lsls_reg,lsrs_reg,adds_reg,sub_sp_imm,add_sp_imm)
 import seq_Patch as seq
 SITE=0x080472A8;EXPECTED=bytes.fromhex('10b5039a')
 PAD_SITE=0x0803D7FE;PAD_EXPECTED=bytes.fromhex('70b50646')
@@ -15,6 +15,12 @@ RELEASE_SITE=0x0803D896;RELEASE_EXPECTED=bytes.fromhex('38b50446')
 NEW_SITE=0x08037C84;NEW_EXPECTED=bytes.fromhex('10b50c46')
 APPLY_SITE=0x08037E3C;APPLY_EXPECTED=bytes.fromhex('f8b50446')
 BUTTON_SITE=0x0803D8FC;BUTTON_EXPECTED=bytes.fromhex('40f0ca81')
+BUTTON_GATE_SITE=0x0803D900;BUTTON_GATE_EXPECTED=bytes.fromhex('60690021')
+BUTTON_UP_SITE=0x0803DDB0;BUTTON_UP_EXPECTED=bytes.fromhex('38b50446')
+START_SITE=0x08033D30;START_EXPECTED=bytes.fromhex('0c3838b5')
+CONTINUE_SITE=0x08033E04;CONTINUE_EXPECTED=bytes.fromhex('0c3838b5')
+SAVE_SITE=0x08037ED0;SAVE_EXPECTED=bytes.fromhex('2de9f847')
+SYNC_SITE=0x08048932;SYNC_EXPECTED=bytes.fromhex('2de9f041')
 BUTTON_CONTINUE=0x0803D900;BUTTON_REJECT=0x0803DC94
 CODE_BASE=0x0807C000;CODE_LIMIT=0x0807D400
 PROJECT_LOAD_VTABLE=0x08066FA0;PROJECT_VTABLE=0x08066F64;CONTROLLER_VTABLE=0x080672E4
@@ -26,7 +32,10 @@ HELD=seq.OFF_PROJECT_RECOVERY_HELD;STAGE=seq.OFF_PROJECT_RECOVERY_STAGE
 CLEAN=0;CLOSING=1;READY=2;RETRY=3;READ_OK=4;NEW_OK=5;DEAD=6
 HOOKS=((SITE,EXPECTED,'read_result'),(PAD_SITE,PAD_EXPECTED,'pad'),
        (RELEASE_SITE,RELEASE_EXPECTED,'release'),(NEW_SITE,NEW_EXPECTED,'new'),
-       (APPLY_SITE,APPLY_EXPECTED,'apply'),(BUTTON_SITE,BUTTON_EXPECTED,'button_busy'))
+       (APPLY_SITE,APPLY_EXPECTED,'apply'),(BUTTON_SITE,BUTTON_EXPECTED,'button_busy'),
+       (BUTTON_GATE_SITE,BUTTON_GATE_EXPECTED,'button_gate'),(BUTTON_UP_SITE,BUTTON_UP_EXPECTED,'button_up'),
+       (START_SITE,START_EXPECTED,'start'),(CONTINUE_SITE,CONTINUE_EXPECTED,'cont'),
+       (SAVE_SITE,SAVE_EXPECTED,'save'),(SYNC_SITE,SYNC_EXPECTED,'sync_all'))
 
 def arm_code(seq_state,ram_limit):
     a=Asm(CODE_BASE);E=a.emit;fixups=[]
@@ -96,6 +105,7 @@ def arm_code(seq_state,ram_limit):
     context('pad_exit');E(raw,bytes.fromhex('72b6')) # checked unmasked thread; serialize admission
     E(ldr_sp,0,0);E(ldr_sp,1,4);E(bl,'admit');E(cmp_imm,0,0);bc('pad_unlock','eq')
     E(mov_reg,4,0);E(mov_reg,5,1)
+    E(ldr_sp,0,0);E(ldr_w,0,0,0xA0);E(cmp_imm,0,0);bc('pad_unlock','ne')
     E(ldr_sp,0,0);E(adds_imm8,0,0x9C);E(ldr_sp,1,4);E(bl,PAD_DOWN)
     E(cmp_imm,0,0);bc('pad_unlock','ne')
     E(ldr_sp,0,0);E(str_imm,0,6,HELD);E(str_imm,5,6,SLOT);stage(RETRY)
@@ -166,11 +176,74 @@ def arm_code(seq_state,ram_limit):
     E(bl,seq_state);E(cmp_imm,0,0);bc('button_blocked','eq');E(mov_reg,6,0)
     E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,1);bc('button_blocked','ne')
     E(raw,bytes.fromhex('72b6'))
-    E(mov_reg,0,4);E(movs_imm,1,0);E(bl,'admit');E(cmp_imm,0,0)
-    E(raw,bytes.fromhex('62b6'));bc('button_blocked','eq')
+    E(mov_reg,0,4);E(movs_imm,1,0);E(bl,'admit');E(cmp_imm,0,0);bc('button_unlock','eq')
+    E(ldr_w,0,4,0xA0);E(movs_imm,1,1);E(lsls_reg,1,5);E(bics_reg,0,1);E(cmp_imm,0,0);bc('button_unlock','ne')
+    E(raw,bytes.fromhex('62b6'))
     E(pop,[0,1,2,3,4,5,6],lr=True)
     a.label('button_stock');E(b_w,BUTTON_CONTINUE)
+    a.label('button_unlock');E(raw,bytes.fromhex('62b6'))
     a.label('button_blocked');E(pop,[0,1,2,3,4,5,6],lr=True);E(b_w,BUTTON_REJECT)
+
+    # Gate all controller buttons while tainted so Play/Record/Save/track/view
+    # cannot play, save or sync partial raw data during quarantine.
+    a.label('button_gate');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('gate_native','eq');E(mov_reg,6,0)
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('gate_native','eq')
+    context('gate_reject');ram(4,0x1E0,'gate_reject')
+    E(ldr_imm,0,4);a.imm32(1,CONTROLLER_VTABLE);E(cmp_reg,0,1);bc('gate_reject','ne')
+    E(cmp_imm,5,27);bc('gate_native','eq')
+    E(cmp_imm,5,26);bc('gate_projects','eq')
+    E(cmp_imm,5,19);bc('gate_page','eq')
+    E(cmp_imm,5,20);bc('gate_reject','ne')
+    a.label('gate_page');E(raw,bytes.fromhex('72b6'))
+    E(mov_reg,0,4);E(movs_imm,1,0);E(bl,'admit');E(cmp_imm,0,0);bc('gate_unlock','eq')
+    E(ldr_w,0,4,0xA0);E(movs_imm,1,1);E(lsls_reg,1,5);E(bics_reg,0,1);E(cmp_imm,0,0);bc('gate_unlock','ne')
+    E(raw,bytes.fromhex('62b6'));E(b_w,'gate_native')
+    a.label('gate_projects')
+    E(ldr_imm,0,6,HELD);E(cmp_imm,0,0);bc('gate_reject','ne')
+    E(ldr_w,0,4,0x9C);E(cmp_imm,0,0);bc('gate_reject','ne')
+    E(ldr_w,0,4,0xA0);a.imm32(1,1<<26);E(bics_reg,0,1);E(cmp_imm,0,0);bc('gate_reject','ne')
+    read(4,0xC,0,'gate_reject');byte0();E(cmp_imm,0,0);bc('gate_reject','ne')
+    read(4,0x14,0,'gate_reject');byte0();E(cmp_imm,0,6);bc('gate_reject','eq')
+    E(b_w,'gate_native')
+    a.label('gate_unlock');E(raw,bytes.fromhex('62b6'))
+    a.label('gate_reject');E(pop,[0,1,2,3,4,5,6],lr=True);E(b_w,BUTTON_REJECT)
+    native32('gate_native',BUTTON_GATE_EXPECTED,BUTTON_GATE_SITE)
+
+    # Clear controller button bitmap on release during busy/quarantine.
+    a.label('button_up');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('button_up_native','eq');E(mov_reg,6,0)
+    context('button_up_native');E(ldr_sp,4,0);E(ldr_sp,5,4)
+    ram(4,0x1E0,'button_up_native');E(cmp_imm,5,28);bc('button_up_native','hs')
+    E(ldr_imm,0,4);a.imm32(1,CONTROLLER_VTABLE);E(cmp_reg,0,1);bc('button_up_native','ne')
+    E(cmp_imm,5,27);bc('button_up_native','eq')
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('button_up_clear','ne')
+    read(4,0x8C,0,'button_up_native');E(movs_imm,1,2);E(tst_reg,0,1);bc('button_up_native','eq')
+    a.imm32(0,0x0664FFFF);E(lsrs_reg,0,5);E(movs_imm,1,1);E(tst_reg,0,1);bc('button_up_native','ne')
+    a.label('button_up_clear');E(mov_reg,0,4);E(adds_imm8,0,0xA0);E(mov_reg,1,5);E(bl,PAD_UP);return32()
+    native32('button_up_native',BUTTON_UP_EXPECTED,BUTTON_UP_SITE)
+
+    a.label('start');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('start_native','eq');E(mov_reg,6,0)
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('start_native','eq');return32()
+    native32('start_native',START_EXPECTED,START_SITE)
+
+    a.label('cont');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('cont_native','eq');E(mov_reg,6,0)
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('cont_native','eq');return32()
+    native32('cont_native',CONTINUE_EXPECTED,CONTINUE_SITE)
+
+    a.label('save');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('save_native','eq');E(mov_reg,6,0)
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('save_native','eq');return32()
+    native32('save_native',SAVE_EXPECTED,SAVE_SITE)
+
+    a.label('sync_all');E(push,[0,1,2,3,4,5,6],lr=True)
+    E(bl,seq_state);E(cmp_imm,0,0);bc('sync_native','eq');E(mov_reg,6,0)
+    E(ldrb_w,0,6,seq.OFF_PROJECT_TAINTED);E(cmp_imm,0,0);bc('sync_native','eq')
+    E(ldrb_w,0,6,STAGE);E(cmp_imm,0,READ_OK);bc('sync_native','eq')
+    E(cmp_imm,0,NEW_OK);bc('sync_native','eq');return32()
+    native32('sync_native',SYNC_EXPECTED,SYNC_SITE)
 
     # Checked active-bank read: return r0=value,r1=valid.
     a.label('word');E(push,[4],lr=True);E(mov_reg,4,1);ram(0,20,'word_no')

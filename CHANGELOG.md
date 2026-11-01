@@ -1,3 +1,55 @@
+## 2026-11-01 — Verify alias safety (1b), native tie playback (2), USB lifecycle (3), and resource budgets (4)
+
+- **M7 1b (Partial-alias safety & button-up cleanup):**
+  - Added hooks in `src/project_load_recovery_patch.py`: `button_gate` (`0x0803D900`), `button_up` (`0x0803DDB0`), `start` (`0x08033D30`), `cont` (`0x08033E04`), `save` (`0x08037ED0`), and `sync_all` (`0x08048932`).
+  - Gated buttons during quarantine (`taint == 1`), blocking `Play` (`button 17`), `Record` (`button 16`), `Save`, and `SyncAll` from reading, playing, or modifying partially overwritten `s.raw`.
+  - Cleared `ctrl+0xA0` button bitmap upon release (`0x0803DDB0`) while busy/quarantine is active.
+  - Verified across both modes in native reset emulation (`logs/recovery-alias-safety-20261101/`).
+- **M7 2 (Native UI tie-bit playback & boundary continuity):**
+  - Disassembled and verified controller view store at `ctrl+0x14` (byte 0: current view, byte 1: parent view history).
+  - Created `scripts/recovery_native_tie_test_support.py`, `tests/test_recovery_native_tie.py`, and `scripts/probe_recovery_native_tie.py`.
+  - Demonstrated native Projects Load of projects containing step byte 6 `tie == 1` records, seamless playback across `15->16`, `31->0`, and `15->16->17` boundaries across 8 tracks in both modes, and Mutate preservation with 0 unmapped RAM repairs and 0 MIDI faults (`logs/recovery-native-tie-20261101/probe/report.json`).
+- **M7 3 (Unified USB MIDI TX/RX, MSC BOT/SCSI & Power Lifecycle):**
+  - Modeled hardware STPPCLK auto-clearing in STM32 OTG_FS `PCGCCTL` (`0xE00`) upon bus resume.
+  - Configured endpoint mask `DAINTMSK` (`0x81C`) for composite OUT1/OUT2/IN1/IN2 endpoints.
+  - Created `scripts/recovery_usb_lifecycle_test_support.py` and `tests/test_recovery_usb_lifecycle.py` verifying USB deconfigure/reconfigure, MSC completion vs MIDI IN1 journal isolation, and suspend/wake/reset lifecycle across both modes (3/3 tests PASS).
+- **M7 4 & 5 (Resource Budget Synthesis & Packaged Verification):**
+  - Packaged candidate `build/circuitrhythm-5706-phase1-recovery.syx` (SYX SHA256: `1c7f376f539e549fbeef6ecd861b40be7e91580ee476d53a5ddfe8b614ee3c25`, Image SHA256: `7ea3232ca46b2cafa538b0e71cd281b09cc2aaec54ef7abb26f3cf3273aaade6`, MPEG-2 CRC32: `0x2b5211d2`, 57 patches, 10851 changed bytes).
+  - Synthesized resource budgets: 1088B total RAM, peak 64B stack consumption, >40 KB MSP headroom, >78 KB free flash headroom, bounded masked instructions.
+  - Core verifier `verify_recovery_candidate.py --core-only` passed 170 packaged tests and all 6 Phase 1 criteria (`logs/recovery-verify-core/report.json`). Physical release remains NO-GO awaiting user confirmation.
+
+## 2026-11-01 — Complete and verify Close-confirmed narrow Load/New recovery (M7 1a)
+
+- Integrated `src/project_load_recovery_patch.py` across `scripts/build_recovery_candidate.py`,
+  `scripts/audit_recovery_candidate.py`, `scripts/verify_recovery_candidate.py`,
+  `scripts/probe_recovery_load_reentry.py`, `tests/test_project_load_guard.py`, and
+  `tests/test_shared_project.py`.
+- Found and fixed a stock controller busy gate at `0x0803D8FC` (`BUTTON_SITE`)
+  that blocked Projects Page Up/Down (`button 19/20`) when `ctrl+0x8C` (`flags`) bit 1
+  was set (`flags=3`). Added `button_busy` hook in `[0x0807C000, 0x0807D400)` cave so
+  Projects Page buttons (`19/20`) are admitted only when `admit(ctrl, 0) == 1`
+  (`taint == 1`, `STAGE == READY`, `active_view == 6`, stopped, unheld).
+- Built and audited `build/circuitrhythm-5706-phase1-recovery.syx`
+  (SYX SHA256 `d173d0fa9077acd39565745a8fb09889a26f5915beb8c21224ff6d0e7b859cc8`,
+  Image SHA256 `f8e27598311354ef177160eb5a62db38f7c267b0fa44debc9557340c8b2aeda9`,
+  MPEG-2 CRC32 `0x089e6fe5`, 51 patches, 10162 changed bytes vs stock, 2312B in
+  `[0x0807C000, 0x0807D400)`).
+- Upgraded `scripts/audit_recovery_candidate.py` (`audit-v3/report.json`) to verify
+  original stock bytes across all 6 recovery hook sites, cave boundaries, internal call/branch
+  targets, 8B stack alignment (`push`/`pop` symmetry), PRIMASK restoration, bounded
+  state writes (`0x44..0x66`), and zero direct writes to raw project RAM (`0x20010000`).
+- Verified 11 synthetic boundary tests (`test_project_load_recovery.py`), 43 affected
+  packaged regressions + 6 scoped Phase 1 criteria (`packaged-v2/report.json`), and
+  2 full native reset acceptance runs (`probe-normal-final` Mode 0 and
+  `probe-sequencer-final` Mode 1, 300 IRQ/Main cycles each) on the fixed candidate
+  (56 distinct passing tests on `d173d0fa…`; evidence in
+  `logs/recovery-load-recovery-20261101-integration/`).
+- Identified next M7 1b boundary in live emulation: while `taint == 1`, `button(17)`
+  (Play) and `button(16)` (Record) still pass `0x0803D8FC` and start transport on
+  partially overwritten `s.raw`, and `0x0803DDB0` (`button_up`) leaves `ctrl+0xA0`
+  bit 19 set on Page button release while `flags` bit 1 is set. M7 remains NO-GO;
+  no physical device access.
+
 ## 2026-11-01 — Preserve unfinished Load/New recovery for handoff
 
 - WIP source adds Close descriptor/generation matching, narrow Projects

@@ -26,15 +26,19 @@ def audit_load_recovery(image,stock,fixed,out):
             assert len(old)==1 and old[0].mnemonic=='bne.w' and old[0].operands[0].imm==g.BUTTON_REJECT
             assert I[L[name]].mnemonic=='beq.w' and I[L[name]].operands[0].imm==L['button_stock']
         else:
-            label=L[{'read_result':'read_native','pad':'pad_native','release':'release_native','new':'new_native','apply':'apply_native'}[name]]
+            label=L[{'read_result':'read_native','pad':'pad_native','release':'release_native','new':'new_native','apply':'apply_native',
+                     'button_gate':'gate_native','button_up':'button_up_native','start':'start_native','cont':'cont_native',
+                     'save':'save_native','sync_all':'sync_native'}[name]]
             if name!='apply':label+=I[label].size
             assert image[label-BASE:label+4-BASE]==original
-        assert image[site+4-BASE:site+8-BASE]==stock[site+4-BASE:site+8-BASE]
+        if site+4!=g.BUTTON_GATE_SITE:
+            assert image[site+4-BASE:site+8-BASE]==stock[site+4-BASE:site+8-BASE]
         hooks.append(dict(site=hex(site),original=original.hex(),entry=hex(L[name])))
     external={fixed.seq_code()[1]['c_seq_state'],g.NATIVE_CLOSE,g.NATIVE_LOAD,g.READ_WORD,g.PAD_DOWN,g.PAD_UP}
     internal={L[n] for n in ('word','operation_matches','admit','apply_native')}
     tails={g.SITE+4:-8,g.PAD_SITE+4:-16,g.RELEASE_SITE+4:-16,g.NEW_SITE+4:-8,g.APPLY_SITE+4:-24,
-           g.BUTTON_CONTINUE:0,g.BUTTON_REJECT:0}
+           g.BUTTON_CONTINUE:0,g.BUTTON_REJECT:0,g.BUTTON_GATE_SITE+4:0,g.BUTTON_UP_SITE+4:-16,
+           g.START_SITE+4:-16,g.CONTINUE_SITE+4:-16,g.SAVE_SITE+4:-36,g.SYNC_SITE+4:-24}
     stores=[]
     # Every nonstack store is a fixed field in the existing seq reservation,
     # or the validated 4-byte callback bridge. No raw/project pointer store.
@@ -75,9 +79,12 @@ def audit_load_recovery(image,stock,fixed,out):
         assert image[lo-BASE:hi-BASE]==stock[lo-BASE:hi-BASE]
     # No writes or interrupt-mask changes in bounded admission/read helpers.
     assert all(not i.mnemonic.startswith(('str','stm')) and i.mnemonic not in ('cpsid','cpsie','msr') for i in ins if i.address>=L['word'])
-    assert [(i.mnemonic,i.op_str) for i in ins if i.mnemonic in ('cpsid','cpsie')]==[('cpsid','i'),('cpsie','i'),('cpsie','i'),('cpsid','i'),('cpsie','i')]
+    assert [(i.mnemonic,i.op_str) for i in ins if i.mnemonic in ('cpsid','cpsie')]==[
+        ('cpsid','i'),('cpsie','i'),('cpsie','i'),
+        ('cpsid','i'),('cpsie','i'),('cpsie','i'),
+        ('cpsid','i'),('cpsie','i'),('cpsie','i')]
     masks=[i for i in ins if i.mnemonic=='cpsid']
-    for mask,(start,fail) in zip(masks,(('pad','pad_exit'),('button_busy','button_blocked'))):
+    for mask,(start,fail) in zip(masks,(('pad','pad_exit'),('button_busy','button_blocked'),('button_gate','gate_reject'))):
         prefix=[i for i in ins if L[start]<=i.address<mask.address]
         assert [(i.mnemonic,i.op_str) for i in prefix if i.mnemonic=='mrs']==[('mrs','r1, ipsr'),('mrs','r1, primask'),('mrs','r1, basepri')]
         for j,i in enumerate(prefix):
@@ -85,7 +92,8 @@ def audit_load_recovery(image,stock,fixed,out):
                 assert prefix[j+1].mnemonic=='cmp' and prefix[j+1].op_str=='r1, #0'
                 assert prefix[j+2].mnemonic.startswith('bne') and prefix[j+2].operands[-1].imm==L[fail]
     functions={}
-    for name in ('read_result','close_done','pad','release','new','apply','apply_native','button_busy','word','operation_matches','admit'):
+    for name in ('read_result','close_done','pad','release','new','apply','apply_native','button_busy',
+                 'button_gate','button_up','start','cont','save','sync_all','word','operation_matches','admit'):
         work=[(L[name],0,False)];seen=set();exits=set();calls=[];max_stack=0
         while work:
             pc,depth,locked=work.pop()

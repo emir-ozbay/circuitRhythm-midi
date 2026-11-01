@@ -215,4 +215,43 @@ class ProjectLoadRecoveryTests(unittest.TestCase):
             self.call(guard.BUTTON_SITE,end=guard.BUTTON_CONTINUE if z else guard.BUTTON_REJECT)
             self.assertEqual(self.u.reg_read(UC_ARM_REG_PRIMASK),mask)
 
+    def test_quarantine_alias_safety_gates_buttons_button_up_start_save_and_sync(self):
+        self.setup_graph();cookie=self.fail_read();self.close(cookie)
+        # Held controller button blocks pad and busy page admission.
+        self.word(self.ctrl+0xA0,1<<25);n=len(self.calls)
+        self.call(guard.PAD_SITE,self.ctrl,1,96);self.assertEqual(len(self.calls),n)
+        self.u.reg_write(UC_ARM_REG_R4,self.ctrl);self.u.reg_write(UC_ARM_REG_R5,19);self.u.reg_write(UC_ARM_REG_APSR,0)
+        self.call(guard.BUTTON_SITE,end=guard.BUTTON_REJECT)
+        self.word(self.ctrl+0xA0,0)
+        # Button gate at 0x0803D900 blocks track/view/transport/modifier buttons while tainted.
+        for btn in (0,7,8,9,10,11,12,13,14,15,16,17,18,21,22,23,24,25,26):
+            self.word(self.ctrl+0xA0,1<<btn)
+            self.u.reg_write(UC_ARM_REG_R4,self.ctrl);self.u.reg_write(UC_ARM_REG_R5,btn)
+            self.call(guard.BUTTON_GATE_SITE,end=guard.BUTTON_REJECT)
+        # Button 26 (Projects) is allowed at 0x0803D900 only when active_view != 6 and no shift/pads/other buttons held.
+        self.set_store(self.active,0,0);self.word(self.ctrl+0xA0,1<<26)
+        self.u.reg_write(UC_ARM_REG_R4,self.ctrl);self.u.reg_write(UC_ARM_REG_R5,26)
+        self.call(guard.BUTTON_GATE_SITE,end=guard.BUTTON_GATE_SITE+4)
+        self.set_store(self.active,0,6);self.word(self.ctrl+0xA0,0)
+        # Button 27 (Shift) and READY 19/20 pass through 0x0803D900.
+        for btn in (19,20,27):
+            self.word(self.ctrl+0xA0,1<<btn)
+            self.u.reg_write(UC_ARM_REG_R4,self.ctrl);self.u.reg_write(UC_ARM_REG_R5,btn)
+            self.call(guard.BUTTON_GATE_SITE,end=guard.BUTTON_GATE_SITE+4)
+            if btn!=27:
+                self.call(guard.BUTTON_UP_SITE,self.ctrl,btn)
+                self.assertEqual(self.read(self.ctrl+0xA0),0)
+        self.word(self.ctrl+0xA0,0)
+        # Direct backend Start, Continue, Save, and unauthorized SyncAll return early while tainted.
+        for site,native in ((guard.START_SITE,'start_native'),(guard.CONTINUE_SITE,'cont_native'),
+                            (guard.SAVE_SITE,'save_native'),(guard.SYNC_SITE,'sync_native')):
+            self.call(site,self.p,0)
+        for stage in (guard.READ_OK,guard.NEW_OK):
+            self.byte(guard.STAGE,stage)
+            self.call(guard.SYNC_SITE,self.p,0,end=self.g['sync_native'])
+        self.byte(base.seq.OFF_PROJECT_TAINTED,0)
+        for site,native in ((guard.START_SITE,'start_native'),(guard.CONTINUE_SITE,'cont_native'),
+                            (guard.SAVE_SITE,'save_native'),(guard.SYNC_SITE,'sync_native')):
+            self.call(site,self.p,0,end=self.g[native])
+
 if __name__=='__main__':unittest.main()
