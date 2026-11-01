@@ -9,8 +9,8 @@ Build an additional **32-Step MIDI Sequencer Only** mode for Novation Circuit Rh
   1. Display and edit all **32 steps simultaneously** across the 32 pads when in the main Step/Sample view (`grid_mode == 0`), with continuous playhead flow across steps 1–32.
   2. Lock the `1–16` page offset to `0` in `grid_mode == 0` (preventing `+16` overflow), while **fully preserving** the `1–16` page button (`1–16 / 17–32` toggle) and bottom-half pad layouts in `Note` (`mode 1/7`), `Velocity` (`mode 2`), `Gate` (`mode 3`), `Pattern Settings` (`mode 4`), `Microstep` (`mode 5`), and `Probability` (`mode 6`).
   3. Clean up held step ownership masks (`view + 0xB8`, `view + 0xC0`, `view + 0x74` bit 3) on track or view mode changes.
-  4. Provide **32 independent Sequencer Projects** using the stock Projects View's second page (`[proj_view + 0x36] = 1`, slots `32..63`) in Sequencer Mode and locking Normal Mode to the first page (`[proj_view + 0x36] = 0`, slots `0..31`), while disabling Up/Down project page switching and disabling the `Packs` view (`Shift + Projects`, `0x0803DB54`) in Sequencer Mode. Stock Load, New (empty pad), Save, Duplicate, and Clear (Delete) work natively.
-  5. Toggle between Normal Mode and Sequencer Only Mode via a safe button combination, muting internal sample playback in Sequencer Mode while keeping MIDI Note On/Off and Clock active.
+  4. Share the current project and all64 stock slots between Normal and Sequencer modes. Preserve stock Projects pages, Up/Down, Packs and Load/New/Save/Duplicate/Clear. No bank isolation.
+  5. Shift + Sample Rec changes only runtime mode, pad presentation and internal sample muting, without project I/O. Admit only when transport is stopped, held ownership is empty and project I/O is idle. Unsaved edits remain in the same project; dirty is not a rejection condition.
 - **Phase 2 (Later):** Root Note + Macro Knob Chord/Triad generator (Mono, 5th, Maj, Min, Sus2/4, 7ths with Note Off tracking) and `1–16` + Pad length shortcut.
 - **Permanently Out of Scope:** 64/128 steps, independent multi-note polyphony, Elektron extensions, custom synth/DSP engines, or custom SD filesystem code.
 

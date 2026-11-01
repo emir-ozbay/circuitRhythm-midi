@@ -13,7 +13,7 @@ Novation Circuit Rhythm (stok build 5706) üzerinde, cihazın normal sample groo
 ### Faz 1: Çekirdek 32-Adım Sequencer Paketi (1. Gerçek Cihaz Testi Hedefi)
 1. **Ana Ekranda 32 Pad = 32 Adım (`grid_mode == 0`):**
    - Eski Sample/Step sayfasında (`grid_mode == 0`) 32 pad'in tamamı aynı pattern'in 1–32. adımlarını birlikte gösterir ve düzenler (üst 16 pad = 1–16, alt 16 pad = 17–32).
-   - Playhead (yürüyen imleç, durum bit 0) 1. adımdan 32. adıma kesintisiz akar.
+   - Playhead (yürüyen imleç) 1. adımdan 32. adıma kesintisiz akar. Native player zamanı `view+0x1C` üzerinden durum bit6'sına bağlanır; önceki bit0 etiketi edit/recorder zamanını bununla karıştırıyordu. Ayrıntı: `docs/MIDI-RECOVERY-PLAYBACK-5706.md`.
    - 8 track ve mevcut pattern sayısı aynen korunur.
 2. **Sayfa (`1–16`) Tuşu ve Görünüm Bağımsızlığı:**
    - Ana 32-pad ekranında (`grid_mode == 0`) iki sayfa da ekranda olduğu için `1–16` sayfa kaydırma ofseti `0`'a kilitlenir (`+16` eklenmez, `pad & 0x1F` taşma koruması uygulanır).
@@ -21,13 +21,17 @@ Novation Circuit Rhythm (stok build 5706) üzerinde, cihazın normal sample groo
    - Pattern uzunluğu (Start/End step), yön, hız ve Mutate işlemleri `Pattern Settings` sayfasında (`mode 4`) `1–16` sayfa tuşuyla birlikte orijinal şekilde çalışmaya devam eder.
 3. **Sahiplik (Ownership) Temizliği:**
    - Pad basılı tutulurken track veya ekran (`grid_mode`) değiştirildiğinde basılı adım maskeleri (`view + 0xB8`, `view + 0xC0`) ve `held` biti (`view + 0x74` bit 3) temizlenerek asılı LED/adım kalması engellenir.
-4. **Bağımsız 32 Sequencer Projesi (`[proj_view + 0x36]`) ve Packs Kilidi:**
-   - Stok Projects ekranındaki (`0x0804F080`) 64 proje yuvasının 1. sayfası (`[proj_view + 0x36] = 0`, Proje 1–32) Normal Sample moduna, 2. sayfası (`[proj_view + 0x36] = 1`, Proje 33–64) ise Sequencer Only moduna kilitlenir.
-   - Projects ekranında Up/Down ile sayfa geçişi (`0x0804F12C`) ve Sequencer modunda `Packs` sayfası (`Shift + Projects`, `0x0803DB54`) devre dışı bırakılır.
-   - Böylece Sequencer modunda `Projects` tuşuna basıldığında, normal projelerden tamamen bağımsız **32 adet Sequencer projesi** görülür; boş pad ile yeni proje açma, `Save`, `Duplicate` ve `Clear` (Delete) %100 orijinal Novation koduyla çalışır.
-5. **Mod Geçişi ve Sadece MIDI Çıkışı (Dahili Sample Susturma):**
-   - Güvenli bir tuş kombinasyonuyla (ör. `Shift + Sample Rec` veya `Shift + Note`) Normal Mod ile Sequencer Only Modu arasında geçiş yapılır.
-   - Sequencer Only modundayken dahili sample ses motoru tetiklemesi susturulur, yalnızca harici MIDI Note On/Off ve CC/Clock çıkışı gönderilir.
+4. **Ortak projeler ve stok proje işlemleri (26 Ekim 2026 kullanıcı kararı):**
+   - Normal ve Sequencer modu aynı açık projeyi ve stok64 proje yuvasını paylaşır.
+   - Mod değişimi Load/New/Save/Duplicate/Clear çağırmaz; proje/banka değişmez.
+   - Projects iki sayfası, Up/Down ve Packs stok davranışını korur.
+   - Nota, velocity, gate ve pattern düzenlemeleri ortaktır; Save aynı projeyi kaydeder.
+5. **Güvenli mod geçişi ve MIDI-only:**
+   - Shift + Sample Rec, transport durmuş ve pad/nota sahiplikleri boşken geçiş yapar.
+   - Proje I/O busy veya bağlam eksikse geçiş reddedilir; dirty olması engel değildir.
+   - Sequencer modu32-pad görünümünü ve dahili sample susturmasını etkinleştirir.
+   - MIDI Note On/Off ve Clock yolları korunur. Harici MIDI/scheduler eşzamanlılık kanıtı hâlâ gereklidir.
+   - Mod seçimi geçici RAM durumudur; proje dosya biçimine yeni alan eklenmez.
 
 ### Faz 2: Müzikal Genişleme Paketi (2. Gerçek Cihaz Testi Hedefi)
 1. **Root Nota + Macro Knob ile Akor / Triad Üretici:**
@@ -41,4 +45,4 @@ Novation Circuit Rhythm (stok build 5706) üzerinde, cihazın normal sample groo
 ## 3. Kapsam Dışı (Kalıcı Olarak Çıkarılanlar)
 - **64 ve 128 Adım:** Stok veri yapısındaki parametre örtüşmesi ve RAM sınırı nedeniyle 64 adım hedefinden tamamen vazgeçilmiştir; adım sınırı kalıcı olarak **32 adımdır**.
 - **Bağımsız Çok Notalı Polifoni:** Her notanın ayrı gate/velocity taşıdığı serbest polifoni kapsam dışıdır (yerine Faz 2'deki Root + Knob Akor üretici kullanılacaktır).
-- **Özel SD Kart Dosya Sistemi:** SD kart sürücüsüne müdahale edilmeyecek, stok 2. proje bankası (`33..64`) kullanılacaktır.
+- **Özel SD Kart Dosya Sistemi:** SD kart sürücüsüne müdahale edilmeyecek; stok proje sistemi ortak kullanılacaktır.

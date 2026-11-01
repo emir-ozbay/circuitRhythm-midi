@@ -1,0 +1,57 @@
+{
+  "authorization": "Explicit user approval via request_user_input_async reply: Evet, eski kapsam testlerini yeni testlerle degistir",
+  "snapshot_sha256": {
+    "test_phase1_safety.py": "d0a6299783dbb80dad9c746562ef58a35a5ccab4d160eea11da7f179840d7f24",
+    "test_reaudit_abi.py": "72568c8ed48cafa0c6ca809066016f6b1ae359b922bdbe3693e68118f3c794b7",
+    "test_projects_and_mode.py": "cc706d283ac639720663d40951743293dc2dceccf482e3845575c2d775732b1a"
+  },
+  "superseded_methods": {
+    "test_phase1_safety.py": [
+      "test_mode_switch_updates_open_projects_view_and_validates_action_bank",
+      "test_mode_transition_state_machine_and_active_project_isolation",
+      "test_real_projects_dispatch_load_duplicate_save_clear_all_slots",
+      "test_stubbed_midi_call_recording_smoke"
+    ],
+    "test_reaudit_abi.py": [
+      "test_clear_guard_preserves_bank_across_stock_read",
+      "test_close_result_rejects_bad_context_and_invalid_heap",
+      "test_completed_apply_clears_failed_load_quarantine",
+      "test_containment_cleans_phase_and_preserves_mode_dirty_and_owner",
+      "test_containment_preserves_entire_live_project_before_any_read",
+      "test_counterfactual_without_containment_still_corrupts_live_pattern",
+      "test_edit_while_close_pending_survives_success_and_duplicate",
+      "test_failed_load_blocks_dispatch_and_direct_save",
+      "test_generic_read_callback_keeps_stock_path_and_abi",
+      "test_invalid_slot_rejects_without_dispatch",
+      "test_load_close_context_and_heap_failure_write_no_state",
+      "test_load_close_rejects_wrong_target_and_duplicate",
+      "test_load_error_only_cancels_its_own_transition",
+      "test_load_read_and_close_errors_do_not_reach_project_commit",
+      "test_missing_project_context_never_commits_mode",
+      "test_partial_project_read_does_not_apply_failed_buffer",
+      "test_pending_midi_record_blocks_mode_switch_and_save_ack",
+      "test_pending_scan_all_tracks_and_invalid_pointers",
+      "test_projects_reentry_does_not_replace_active_transition_context",
+      "test_real_dispatch_waits_for_matching_completion",
+      "test_record_start_rejected_inflight_and_restores_interrupt_mask",
+      "test_rejected_foreign_dispatch_cannot_replace_transition_owner",
+      "test_save_completion_retains_edits_after_snapshot",
+      "test_save_entry_fails_closed_without_valid_state",
+      "test_save_error_invalidates_snapshot_before_late_ack",
+      "test_save_error_ownership_and_interrupt_mask",
+      "test_save_gate_preserves_bank_across_stock_read",
+      "test_save_success_callback_forwards_to_stock_boundary",
+      "test_stock_storage_queue_defers_save_ack_and_rejects_overlap",
+      "test_storage_result_bridge_preserves_nonproject_callback",
+      "test_timer_forwards_all_five_arguments",
+      "test_wrong_slot_load_completion_preserves_transition_and_dirty"
+    ],
+    "test_projects_and_mode.py": [
+      "test_packs_view_locked_in_sequencer_mode",
+      "test_projects_view_independent_32_projects_and_page_lock",
+      "test_shift_sample_rec_mode_toggle"
+    ]
+  },
+  "replacement_contract": "tests/test_shared_project.py plus migrated current UI/MIDI assertions",
+  "no_skips": true
+}

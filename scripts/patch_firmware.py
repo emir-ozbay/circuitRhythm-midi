@@ -184,14 +184,18 @@ def split_syx(syx: bytes) -> list[bytes]:
     msgs: list[bytes] = []
     i = 0
     while i < len(syx):
+        if syx[i:i+5] != SYX_PREFIX:
+            raise SysExFormatError(f"Unexpected bytes between frames at {i:#x}")
         try:
-            start = syx.index(0xF0, i)
+            start = i
             end = syx.index(0xF7, start)
         except ValueError:
             break
         msg = syx[start : end + 1]
         if not msg.startswith(SYX_PREFIX):
             raise SysExFormatError(f"Message at offset {start} does not start with Novation prefix")
+        if len(msg) < 7 or any(b > 127 for b in msg[1:-1]):
+            raise SysExFormatError(f"Invalid frame at offset {start:#x}")
         msgs.append(msg)
         i = end + 1
     if not msgs or i != len(syx):
@@ -233,7 +237,7 @@ def unpack_syx(syx: bytes, allow_extended: bool = False) -> dict:
     header_payload = msgs[1][6:-1]
 
     if len(init_payload) != 8 or init_payload[0] != 1 or init_payload[1] != PRODUCT_RHYTHM:
-        raise SysExFormatError(f"Unexpected INIT payload or device ID (expected Rhythm 0x63, got {init_payload[1]:#04x})")
+        raise SysExFormatError("Unexpected INIT payload or device ID (expected Rhythm 0x63)")
     if len(header_payload) != 23 or header_payload[0] != 0:
         raise SysExFormatError("Unexpected HEADER payload length or target")
 
@@ -259,6 +263,10 @@ def unpack_syx(syx: bytes, allow_extended: bool = False) -> dict:
         blocks.append(unpack7(m[6:-1]))
 
     data = b"".join(blocks)
+    if len(data) != (size + 31) // 32 * 32:
+        raise SysExFormatError("Payload block count does not match header size")
+    if data[size:] != b"\xFF" * (len(data) - size):
+        raise SysExFormatError("Non-FF bytes beyond declared image size")
     if len(data) < size:
         raise SysExFormatError(f"Truncated SysEx payload: decoded {len(data)} bytes, header specifies {size}")
 
@@ -285,6 +293,10 @@ def pack_syx(image: bytes, init: bytes, header_prefix: bytes) -> bytes:
     Writes updated image size and MPEG-2 CRC-32 into the HEADER message.
     """
     max_image_size = FLASH_END - APP_BASE
+    if len(init) != 8 or init[:2] != bytes([1, PRODUCT_RHYTHM]) or any(b > 127 for b in init):
+        raise SysExFormatError("Invalid Rhythm INIT metadata")
+    if len(header_prefix) != 7 or header_prefix[0] != 0 or any(b > 127 for b in header_prefix):
+        raise SysExFormatError("Invalid application HEADER metadata")
     if (
         not image
         or len(image) < STOCK_IMAGE_SIZE
@@ -345,14 +357,14 @@ def validate_destination_paths(
     in_res = input_path.resolve()
     out_res = output_path.resolve()
 
-    if in_res == out_res:
+    if in_res == out_res or (in_res.exists() and out_res.exists() and in_res.samefile(out_res)):
         raise DestinationSafetyError(
             f"Output path cannot be identical to input path: {out_res}"
         )
 
     if stock_path is not None:
         stock_res = stock_path.resolve()
-        if out_res == stock_res:
+        if out_res == stock_res or (out_res.exists() and stock_res.exists() and out_res.samefile(stock_res)):
             raise DestinationSafetyError(
                 f"Output path cannot overwrite canonical stock firmware: {stock_res}"
             )
@@ -389,6 +401,8 @@ def validate_patch_ranges(patches: Sequence[PatchHunk]) -> None:
                 )
         else:
             # p.address >= APP_END: extension patch (code cave)
+            if p.address % 4:
+                raise AddressBoundsError("Code cave start must be word aligned")
             if any(b != 0xFF for b in p.expected):
                 raise AddressBoundsError(
                     f"Extension patch '{p.name}' at {p.address:#010x} must expect unprogrammed 0xFF bytes!"
@@ -514,6 +528,12 @@ def patch_firmware(
 
     # Safety checks on destination
     validate_destination_paths(input_path, output_path, stock_path)
+    manifest_path = (manifest_path or output_path.with_suffix(".manifest.json")).resolve()
+    validate_destination_paths(input_path, manifest_path, stock_path)
+    if manifest_path == output_path or (
+        manifest_path.exists() and output_path.exists() and manifest_path.samefile(output_path)
+    ):
+        raise DestinationSafetyError("Manifest cannot overwrite output SysEx")
 
     # Read and validate input SysEx
     raw_syx = input_path.read_bytes()
@@ -596,6 +616,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     root = Path(__file__).resolve().parents[1]
     default_stock = root / "stock" / "circuitrhythm-firmware-5706.syx"
     default_output = root / "build" / "circuitrhythm-5706-m2-candidate.syx"
+    phase1_output = root / "build" / "circuitrhythm-5706-phase1-sequencer.syx"
 
     parser.add_argument(
         "--input",
@@ -606,8 +627,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=default_output,
-        help="Path for generated patched .syx file (must be under build/ or non-stock location)",
+        default=None,
+        help="Path for generated patched .syx file (default depends on target mode)",
     )
     parser.add_argument(
         "--manifest",
@@ -619,6 +640,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--candidate-m2",
         action="store_true",
         help="Apply canonical M2 diagnostic patch (step held LED color: palette 31 -> 30)",
+    )
+    parser.add_argument(
+        "--build-phase1",
+        action="store_true",
+        help="Build Phase 1 consolidated 32-step sequencer firmware image",
     )
     parser.add_argument(
         "--verify-only",
@@ -640,21 +666,35 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     patches: list[PatchHunk] = []
-    if args.candidate_m2:
+    output_path = args.output
+    if args.build_phase1:
+        src_path = root / "src"
+        if str(src_path) not in sys.path:
+            sys.path.insert(0, str(src_path))
+        try:
+            from seq_patch import build_phase1_patches
+        except ImportError:
+            from seq_Patch import build_phase1_patches
+        patches = build_phase1_patches()
+        if output_path is None:
+            output_path = phase1_output
+    elif args.candidate_m2:
         patches.append(M2_CANDIDATE_PATCH)
+        if output_path is None:
+            output_path = default_output
     else:
-        print("No patch specified. Use --candidate-m2 or specify patches.", file=sys.stderr)
+        print("No patch specified. Use --candidate-m2 or --build-phase1.", file=sys.stderr)
         return 1
 
     print("Executing safe firmware patching...")
     print(f"  Input:    {args.input}")
-    print(f"  Output:   {args.output}")
+    print(f"  Output:   {output_path}")
     print(f"  Patches:  {len(patches)}")
 
     try:
         manifest = patch_firmware(
             input_path=args.input,
-            output_path=args.output,
+            output_path=output_path,
             patches=patches,
             manifest_path=args.manifest,
             stock_path=default_stock,
@@ -664,7 +704,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"  Output Image SHA-256: {manifest['output']['image_sha256']}")
         print(f"  Output Image CRC-32:  {manifest['output']['image_crc32_mpeg2']}")
         print(f"  Total bytes changed:  {manifest['total_bytes_changed']}")
-        print(f"  Manifest written to:  {args.manifest or args.output.with_suffix('.manifest.json')}")
+        print(f"  Manifest written to:  {args.manifest or output_path.with_suffix('.manifest.json')}")
         return 0
     except PatcherError as err:
         print(f"\nPATCHER ERROR: {err}", file=sys.stderr)

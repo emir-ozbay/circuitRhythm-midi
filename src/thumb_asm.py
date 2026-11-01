@@ -622,6 +622,11 @@ class Asm:
     def emit(self, fn, *args, **kw) -> None:
         self.items.append(("ins", (fn, args, kw)))
 
+    def align(self, alignment: int = 4) -> None:
+        """Align following data; never execute this zero-filled literal padding."""
+        assert alignment >= 2 and alignment & (alignment - 1) == 0
+        self.items.append(("align", alignment))
+
     def imm32(self, rd: int, val: int) -> None:
         """Emits MOVW + MOVT pair to load a 32-bit constant into rd."""
         self.emit(movw, rd, val & 0xFFFF)
@@ -635,6 +640,8 @@ class Asm:
         for kind, p in self.items:
             if kind == "label":
                 labels[p] = addr  # type: ignore[index]
+            elif kind == "align":
+                addr += -addr % p
             else:
                 fn, args, kw = p  # type: ignore[misc]
                 addr += _ins_size(fn, args, kw)
@@ -644,6 +651,11 @@ class Asm:
         addr = self.base
         for kind, p in self.items:
             if kind == "label":
+                continue
+            if kind == "align":
+                padding = -addr % p
+                out += bytes(padding)
+                addr += padding
                 continue
             fn, args, kw = p  # type: ignore[misc]
             names = args
